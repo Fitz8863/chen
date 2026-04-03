@@ -106,78 +106,98 @@
 
 {% block extra_js %}
 <script>
-let settingsLoaded = false;
-
-document.addEventListener('DOMContentLoaded', function() {
-    if (settingsLoaded) return;
-    settingsLoaded = true;
+(function() {
+    let settingsLoaded = false;
     
-    loadSystemConfig();
-    initThemeButtons();
-    
-    document.getElementById('allowRegistrationSwitch').addEventListener('change', function() {
-        saveSystemConfig();
-    });
-});
-
-function initThemeButtons() {
-    const currentTheme = localStorage.getItem('theme') || 'dark';
-    updateThemeButtons(currentTheme);
-}
-
-function setTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-    updateThemeButtons(theme);
-}
-
-function updateThemeButtons(theme) {
-    const btnLight = document.getElementById('btnThemeLight');
-    const btnDark = document.getElementById('btnThemeDark');
-    
-    if (theme === 'light') {
-        btnLight.classList.add('active');
-        btnDark.classList.remove('active');
-    } else {
-        btnLight.classList.remove('active');
-        btnDark.classList.add('active');
-    }
-}
-
-function loadSystemConfig() {
-    fetch('/settings/api/system/config')
-        .then(res => res.json())
-        .then(data => {
-            const isOn = data.allow_registration !== false;
-            const switchEl = document.getElementById('allowRegistrationSwitch');
-            const statusEl = document.getElementById('allowRegistrationStatus');
-            if (switchEl) {
-                switchEl.checked = isOn;
-            }
-            if (statusEl) {
-                statusEl.textContent = isOn ? '已开启' : '已关闭';
-            }
-        });
-}
-
-function saveSystemConfig() {
-    const allowRegistration = document.getElementById('allowRegistrationSwitch').checked;
-    fetch('/settings/api/system/config', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            allow_registration: allowRegistration
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.message) {
-            const msg = allowRegistration ? '已开启用户注册' : '已关闭用户注册';
-            alert(msg);
+    document.addEventListener('DOMContentLoaded', function() {
+        if (settingsLoaded) return;
+        settingsLoaded = true;
+        
+        {% if current_user.is_super_admin %}
+        loadSystemConfig();
+        {% endif %}
+        initThemeButtons();
+        
+        const regSwitch = document.getElementById('allowRegistrationSwitch');
+        if (regSwitch) {
+            regSwitch.addEventListener('change', function() {
+                saveSystemConfig();
+            });
         }
     });
-}
+    
+    function initThemeButtons() {
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        updateThemeButtons(currentTheme);
+    }
+    
+    window.setTheme = function(theme) {
+        console.log('Setting theme to:', theme);
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        updateThemeButtons(theme);
+    }
+    
+    function updateThemeButtons(theme) {
+        console.log('Updating buttons for theme:', theme);
+        const btnLight = document.getElementById('btnThemeLight');
+        const btnDark = document.getElementById('btnThemeDark');
+        
+        if (!btnLight || !btnDark) {
+            console.error('Buttons not found!');
+            return;
+        }
+        
+        if (theme === 'light') {
+            btnLight.classList.add('active');
+            btnDark.classList.remove('active');
+        } else {
+            btnLight.classList.remove('active');
+            btnDark.classList.add('active');
+        }
+    }
+    
+    function loadSystemConfig() {
+        fetch('/settings/api/system/config')
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch config');
+                return res.json();
+            })
+            .then(data => {
+                const isOn = data.allow_registration !== false;
+                const switchEl = document.getElementById('allowRegistrationSwitch');
+                const statusEl = document.getElementById('allowRegistrationStatus');
+                if (switchEl) {
+                    switchEl.checked = isOn;
+                }
+                if (statusEl) {
+                    statusEl.textContent = isOn ? '已开启' : '已关闭';
+                }
+            })
+            .catch(err => console.error('Error loading config:', err));
+    }
+    
+    function saveSystemConfig() {
+        const regSwitch = document.getElementById('allowRegistrationSwitch');
+        if (!regSwitch) return;
+        const allowRegistration = regSwitch.checked;
+        fetch('/settings/api/system/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                allow_registration: allowRegistration
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.message) {
+                console.log(data.message);
+            }
+        })
+        .catch(err => console.error('Error saving config:', err));
+    }
+})();
 </script>
-
 {% endblock %}
+
 {% endblock %}

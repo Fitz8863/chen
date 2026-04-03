@@ -68,6 +68,7 @@ class ChatMessage(db.Model):
     content = db.Column(db.Text, default='')
     message_type = db.Column(db.String(20), default='text')
     image_url = db.Column(db.String(255), default='')
+    reply_to_id = db.Column(db.Integer, db.ForeignKey('chat_message.id'), nullable=True)
     is_recalled = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now, index=True)
     room = db.relationship('ChatRoom', back_populates='messages')

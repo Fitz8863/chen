@@ -263,6 +263,7 @@
         // 初始化主题检测，放在 head 中防止闪烁
         (function() {
             const savedTheme = localStorage.getItem('theme') || 'dark';
+            console.log('Initial theme:', savedTheme);
             document.documentElement.setAttribute('data-theme', savedTheme);
         })();
     </script>
@@ -379,7 +380,7 @@
     <style>
         #notification-container {
             position: fixed;
-            bottom: 20px;
+            top: 20px;
             right: 20px;
             z-index: 10000;
             width: 320px;
@@ -391,7 +392,7 @@
                 left: 20px;
                 right: 20px;
                 width: auto;
-                bottom: 20px;
+                top: 20px;
             }
         }
     </style>
@@ -572,6 +573,35 @@
             if (window.innerWidth <= 576) {
                 setTimeout(closeSidebar, 300);
             }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('notification-container');
+            const toast = document.createElement('div');
+            toast.className = 'fade-in mb-3';
+            toast.style.cssText = `
+                background: #1c1917;
+                border: 1px solid ${type === 'error' ? '#ef4444' : '#fb923c'};
+                border-radius: var(--radius-md);
+                padding: 12px 16px;
+                box-shadow: var(--shadow-lg);
+                color: #fafaf9;
+                font-size: 0.9rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                z-index: 10001;
+            `;
+            toast.innerHTML = `
+                <span>${message}</span>
+                <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.5rem;" onclick="this.parentElement.remove()"></button>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
         }
         
         // 响应式调整

@@ -26,7 +26,7 @@ python app.py
 App runs on `http://0.0.0.0:5000` with SocketIO support. Debug mode is disabled in production.
 
 ### Database Setup
-Tables are auto-created on app startup via `db.create_all()` in `blueprints/__init__.py` called by `init_db(app)`.
+Tables are auto-created on app startup via `db.create_all()` in `blueprints/__init__.py`.
 To initialize manually:
 ```bash
 mysql -u root -pheweijie -e "CREATE DATABASE IF NOT EXISTS home DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;"
@@ -44,7 +44,7 @@ pytest tests/test_auth.py::test_login -v
 ```
 
 ### Linting
-No linting tools are in requirements.txt. If adding:
+If adding linting tools:
 ```bash
 # Run Black for formatting
 black .
@@ -57,63 +57,86 @@ flake8 . --max-line-length=120
 
 ### 3.1 Structure
 - `app.py`: Entry point, registers blueprints, initializes extensions, starts video inference daemon.
-- `config.py`: All configuration (DB, mail, YOLO, VLM). **Hardcoded credentials — do not commit changes.**
+- `config.py`: Configuration (DB, mail, YOLO, VLM). **Hardcoded credentials — do not commit changes.**
 - `exts.py`: Flask extension instances (db, socketio, mail) to avoid circular imports.
-- `blueprints/`: Modular logic (MVC controllers). Each file = one blueprint.
+- `blueprints/`: Modular logic (MVC controllers).
 - `templates/`: Jinja2 templates inheriting from `base.html`.
-- `static/`: CSS, JS, uploaded captures (`static/captures/`).
+- `static/`: CSS, JS, uploaded captures.
 - `model/`: YOLO ONNX model files.
 
 ### 3.2 Import Order
-Group imports and separate with a blank line:
 1. Standard library (`os`, `json`, `datetime`)
 2. Third-party (`flask`, `sqlalchemy`, `flask_socketio`)
 3. Local application imports (`.models`, `exts`, `config`)
-
-```python
-import os
-from datetime import datetime
-
-from flask import Blueprint, render_template, jsonify
-from flask_login import login_required
-
-from .models import User
-from exts import db
-```
 
 ### 3.3 Naming Conventions
 - **Files/Modules**: `snake_case.py`
 - **Classes**: `PascalCase`
 - **Functions/Variables**: `snake_case`
 - **Constants**: `UPPER_SNAKE_CASE`
-- **Blueprints**: `snake_case` with `_bp` suffix (e.g., `auth_bp`, `main_bp`)
+- **Blueprints**: `snake_case` with `_bp` suffix (e.g., `auth_bp`)
 
 ### 3.4 Blueprint Structure & API Design
 - Use `url_prefix` in Blueprint definitions.
-- API Endpoints should be prefixed with `/api/` and return `jsonify()`.
-- UI routes return `render_template()`.
-- Register new blueprints in `app.py` after import.
+- API Endpoints: `/api/` prefix, return `jsonify()`.
+- UI routes: return `render_template()`.
 
 ### 3.5 Error Handling
-- **Database**: Wrap in `try-except`, use `db.session.rollback()` on failure.
-- **API**: Return JSON with `error` key and appropriate HTTP status code (400, 401, 403, 404, 500).
-- **UI**: Use `flash(message, category)` for user feedback.
-- **Startup**: Graceful degradation — video inference daemon wraps init in try/except.
+- **Database**: `try-except`, `db.session.rollback()` on failure.
+- **API**: JSON response with `error` key, proper HTTP status codes.
+- **UI**: Use `flash(message, category)`.
 
 ### 3.6 Role-Based Access Control (RBAC)
 - Roles: `admin`, `assistant`, `user`.
-- Use `@admin_required` or `@super_admin_required` decorators from `blueprints.auth`.
-- `admin_required` allows `admin` and `assistant`.
-- `super_admin_required` allows only `admin`.
+- Use `@admin_required` or `@super_admin_required` from `blueprints.auth`.
 
-## 4. Agent Instructions
+## 4. Agentic Development Workflow
 
+- **Think Before Act**: For complex tasks, create a plan and `todowrite` checklist first.
+- **Verify Before Commit**: Always run `flake8` and test affected endpoints.
+- **Minimalist Fixes**: Only fix what is broken. Do not refactor unrelated code.
+- **Database Migrations**: Manually check `blueprints/models.py` against MySQL table structure (`DESCRIBE table_name;`) before altering schema.
+- **Code Reviews**: When an agent proposes significant changes, verify them using `flake8` and local manual testing before finalizing the commit.
+
+## 5. Git Workflow & PR Policy
+- **Branching**: Use `feature/` for new capabilities, `fix/` for bug repairs, and `refactor/` for structural improvements.
+- **Commits**: Follow conventional commits: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`.
+- **Pull Requests**:
+    - Include a clear description of the problem solved.
+    - Reference specific issue numbers if applicable.
+    - Attach screenshots for UI-related changes.
+    - Run the full test suite (`pytest`) before marking a PR as ready for review.
+
+## 6. Advanced Troubleshooting
+- **SQLAlchemy Debugging**: Enable `SQLALCHEMY_ECHO = True` in `config.py` to see generated SQL queries for debugging model interactions.
+- **Live Updates**: Debug SocketIO using the browser console to track `disconnect` and `connect` events, and use the server logs to monitor for `SocketIO` errors or connection drops.
+- **Memory/Process Management**: If the video inference daemon hangs, use `ps -ef | grep video_inference.py` to identify and terminate orphaned processes before restarting the system.
+- **Environment Issues**: If Conda environments fail, ensure `requirements.txt` is updated after installing new packages and run `conda clean -a` to free up disk space.
+
+## 7. Frontend & UI
+- **Bootstrap 5**: Prefer utility classes (e.g., `d-flex`, `p-3`) over adding custom CSS whenever possible to maintain consistency with the default Bootstrap theme.
+- **Jinja2**: Keep templates DRY by using `{% extends 'base.html' %}` and `{% block content %}` for all new UI pages.
+- **JavaScript**: Use `fetch` API for all asynchronous communication with `/api/` endpoints. Keep JS code in separate files in `static/js/` wherever possible, rather than inline `<script>` blocks.
+- **Accessibility**: Ensure basic accessibility compliance (e.g., proper contrast for text, alt text for images) in all new UI components.
+
+## 8. Agent Instructions & AI/Inference
 - **Circular Imports**: Always use `exts.py` for shared extensions. Never import `app` directly into blueprints.
-- **Proactivity**: Before implementing, check if a similar pattern exists in `blueprints/`.
-- **Database**: No migration tool exists. Schema changes = manual SQL or drop + recreate.
-- **Security**: `config.py` contains hardcoded credentials. Never commit credential changes.
-- **AI Inference**: `video_inference.py` runs as a singleton daemon on startup. Guard with `WERKZEUG_RUN_MAIN` check.
-- **ROS2**: Environment includes ROS2 packages. Do not remove them from requirements.txt.
-- **Documentation**: If adding a new feature, update the README if necessary.
-- **Verification**: Run `flake8` before claiming a task is done.
-- **Plans**: Create a `todowrite` list for multi-step tasks.
+- **AI Inference**: `video_inference.py` runs as singleton daemon on startup. Guard with `WERKZEUG_RUN_MAIN` check to prevent multiple instances during development.
+- **ROS2**: Do not remove from `requirements.txt`.
+- **Cameras Configuration**: `cameras.json` handles static camera mappings. Any change to camera connectivity requires updating this file and potentially restarting the inference daemon.
+- **Captures Directory**: `static/captures/` stores all uploaded alert images. Agents should periodically check if image storage space needs cleanup, as this directory can grow indefinitely with thousands of alert images.
+
+## 9. Deployment Considerations
+- **Environment Variables**: Sensitive credentials in `config.py` should be moved to environment variables for production environments to avoid hardcoding secrets in version control.
+- **Production Server**: The Flask development server is not suitable for production. Use a proper WSGI server like `gunicorn` with `eventlet` or `gevent` support for SocketIO compatibility.
+
+## 10. Security Best Practices
+- **Input Sanitization**: Always sanitize input from API endpoints and form submissions to prevent SQL injection and XSS. SQLAlchemy handles parameterization, so avoid `execute()` calls with raw SQL strings.
+- **Authentication**: Ensure all routes that require authentication use the `@login_required` decorator from `flask_login`.
+- **Dependency Auditing**: Regularly run `pip-audit` to identify and fix known vulnerabilities in project dependencies.
+
+## 11. Performance Optimization
+- **Database Indexing**: For tables with high frequent queries (e.g., `Capture` logs), ensure database indexes are correctly defined on frequently filtered columns (like `camera_id` or `timestamp`).
+- **Static Assets**: Use cache headers for static files (`static/`) to improve page load times for end users.
+- **Asset Minification**: Consider using a pipeline (like `Flask-Assets`) to minify JS and CSS files for production.
+

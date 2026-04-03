@@ -59,7 +59,9 @@ def user_rooms(user_id):
                     })
         last_preview = ''
         if last_msg:
-            if last_msg.message_type == 'image':
+            if last_msg.is_recalled:
+                last_preview = '撤回了一条消息'
+            elif last_msg.message_type == 'image':
                 last_preview = '[图片]'
             else:
                 last_preview = last_msg.content
@@ -106,6 +108,15 @@ def api_messages(room_id):
     messages = []
     for m in pagination.items:
         sender = User.query.get(m.sender_id)
+        reply_content = None
+        reply_sender_name = None
+        if m.reply_to_id:
+            quoted_msg = ChatMessage.query.get(m.reply_to_id)
+            if quoted_msg:
+                reply_content = quoted_msg.content
+                quoted_sender = User.query.get(quoted_msg.sender_id)
+                if quoted_sender:
+                    reply_sender_name = quoted_sender.nickname or quoted_sender.username
         messages.append({
             'id': m.id,
             'sender_id': m.sender_id,
@@ -114,13 +125,34 @@ def api_messages(room_id):
             'content': m.content,
             'message_type': m.message_type,
             'image_url': m.image_url,
+            'reply_to_id': m.reply_to_id,
+            'reply_content': reply_content,
+            'reply_sender_name': reply_sender_name,
             'is_recalled': m.is_recalled,
             'time': m.created_at.strftime('%H:%M'),
             'is_mine': m.sender_id == current_user.id,
             'created_at': m.created_at.isoformat(),
         })
     messages.reverse()
-    return jsonify({'messages': messages, 'has_more': pagination.has_prev})
+    return jsonify({'messages': messages, 'has_more': pagination.has_next})
+
+
+@chat_bp.route('/api/rooms/<int:room_id>/members')
+@login_required
+def api_room_members(room_id):
+    members = ChatRoomMember.query.filter_by(room_id=room_id).all()
+    result = []
+    for m in members:
+        u = User.query.get(m.user_id)
+        if u:
+            result.append({
+                'id': u.id,
+                'nickname': u.nickname or u.username,
+                'avatar': u.avatar,
+                'role': u.role,
+                'online': u.id in online_users
+            })
+    return jsonify({'members': result})
 
 
 @chat_bp.route('/api/rooms/create-private', methods=['POST'])
@@ -175,10 +207,14 @@ def handle_disconnect():
 @socketio.on('join_room')
 def handle_join_room(data):
     room_id = data.get('room_id')
+    print(f"[SocketIO] User {current_user.id} attempting to join room: {room_id}")
     member = ChatRoomMember.query.filter_by(room_id=room_id, user_id=current_user.id).first()
     if member:
         join_room(str(room_id))
+        print(f"[SocketIO] User {current_user.id} joined room: {room_id}")
         emit('joined', {'room_id': room_id})
+    else:
+        print(f"[SocketIO] User {current_user.id} denied join room: {room_id}")
 
 
 @socketio.on('leave_room')
@@ -193,22 +229,40 @@ def handle_message(data):
     content = data.get('content', '').strip()
     image_url = data.get('image_url', '')
     message_type = data.get('message_type', 'text')
+    reply_to_id = data.get('reply_to_id')
+    
+    print(f"[SocketIO] handle_message triggered: room={room_id}, content={content}, type={message_type}, reply_to={reply_to_id}")
+    
     if not room_id:
         return
     member = ChatRoomMember.query.filter_by(room_id=room_id, user_id=current_user.id).first()
     if not member:
+        print(f"[SocketIO] User {current_user.id} not in room {room_id}")
         return
+    sender_name = current_user.nickname or current_user.username
     msg = ChatMessage(
         room_id=room_id,
         sender_id=current_user.id,
         content=content,
         message_type=message_type,
-        image_url=image_url
+        image_url=image_url,
+        reply_to_id=reply_to_id
     )
     db.session.add(msg)
     db.session.commit()
-    sender_name = current_user.nickname or current_user.username
-    emit('new_message', {
+    
+    reply_content = None
+    reply_sender_name = None
+    if reply_to_id:
+        quoted_msg = ChatMessage.query.get(reply_to_id)
+        if quoted_msg:
+            reply_content = quoted_msg.content
+            quoted_sender = User.query.get(quoted_msg.sender_id)
+            if quoted_sender:
+                reply_sender_name = quoted_sender.nickname or quoted_sender.username
+    
+    payload = {
+        'id': msg.id,
         'room_id': room_id,
         'sender_id': current_user.id,
         'sender_name': sender_name,
@@ -217,8 +271,16 @@ def handle_message(data):
         'message_type': message_type,
         'image_url': image_url,
         'time': msg.created_at.strftime('%H:%M'),
+        'created_at': msg.created_at.isoformat(),
         'is_recalled': False,
-    }, room=str(room_id))
+        'reply_to_id': reply_to_id,
+        'reply_content': reply_content,
+        'reply_sender_name': reply_sender_name
+    }
+    
+    print(f"[SocketIO] Emitting new_message to room {room_id}: {payload}")
+    from exts import socketio
+    socketio.emit('new_message', payload, room=str(room_id))
 
 
 @chat_bp.route('/api/upload-image', methods=['POST'])
@@ -253,7 +315,7 @@ def recall_message(msg_id):
         return jsonify({'error': '超过2分钟，无法撤回'}), 400
     msg.is_recalled = True
     db.session.commit()
-    emit('message_recalled', {
+    socketio.emit('message_recalled', {
         'msg_id': msg_id,
         'room_id': msg.room_id,
         'sender_id': msg.sender_id,

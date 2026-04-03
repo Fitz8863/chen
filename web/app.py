@@ -40,8 +40,20 @@ if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.config.get('DEBUG'):
         from blueprints.video_inference import video_inference
         video_inference.app = app
         print("[System] 后台视频监控/推理守护进程已成功唤醒（主进程单例）。")
+        
+        # 添加守护进程心跳监控
+        def check_inference_daemon():
+            import threading
+            import time
+            while True:
+                time.sleep(30)
+                threads = [t.name for t in threading.enumerate()]
+                if not any(t.startswith("DaemonSyncThread") for t in threads):
+                    print("[System] 警告：视频监控守护进程已停止，请检查系统负载或推理配置。")
+        
+        socketio.start_background_task(check_inference_daemon)
     except Exception as e:
         print(f"[System] 警告：后台视频守护进程启动失败: {e}")
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
