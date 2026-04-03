@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>注册 - 家庭智能监控系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/bootstrap.min.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@300;400;500&family=ZCOOL+XiaoWei&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #c2410c;
+            --color-paper: #fafaf9;
+            --color-ink: #1c1917;
+            --color-accent: #fb923c;
+            --font-display: 'Noto Serif SC', serif;
+            --font-fancy: 'ZCOOL XiaoWei', serif;
+            --font-body: 'Noto Sans SC', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--color-paper);
+            color: var(--color-ink);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-x: hidden;
+            background-image: 
+                linear-gradient(rgba(28, 25, 23, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(28, 25, 23, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .editorial-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+        .bg-text {
+            position: absolute;
+            font-family: var(--font-display);
+            font-weight: 900;
+            font-size: 15vw;
+            color: rgba(194, 65, 12, 0.03);
+            white-space: nowrap;
+            line-height: 1;
+        }
+        .bg-text-1 { top: -2%; left: -5%; }
+        .bg-text-2 { bottom: -5%; right: -5%; }
+
+        .main-wrapper {
+            display: flex;
+            width: 100%;
+            max-width: 1100px;
+            min-height: 680px;
+            position: relative;
+            z-index: 1;
+            animation: staggerIn 0.8s cubic-bezier(0.2, 1, 0.3, 1);
+            background: #fff;
+            box-shadow: 0 30px 100px rgba(0,0,0,0.1);
+        }
+
+        @keyframes staggerIn {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .cover-panel {
+            flex: 1.2;
+            background: #292524;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: #fafaf9;
+            position: relative;
+            z-index: 2;
+        }
+
+        .cover-panel::after {
+            content: '';
+            position: absolute;
+            top: 40px; left: 40px; bottom: 40px; right: 40px;
+            border: 1px solid rgba(250, 250, 249, 0.1);
+            pointer-events: none;
+        }
+
+        .journal-meta {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--color-accent);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .journal-meta::after { content: ''; flex: 1; height: 1px; background: rgba(250,250,249,0.2); }
+
+        .main-headline {
+            margin: 40px 0;
+        }
+        .main-headline h1 {
+            font-family: var(--font-display);
+            font-size: 4.5rem;
+            line-height: 1.1;
+            font-weight: 900;
+            margin-bottom: 20px;
+        }
+        .main-headline .chinese-title {
+            font-family: var(--font-fancy);
+            font-size: 2.2rem;
+            display: block;
+            margin-top: 10px;
+            color: var(--color-accent);
+        }
+
+        .abstract-box {
+            max-width: 320px;
+            font-size: 0.95rem;
+            opacity: 0.6;
+            font-weight: 300;
+            line-height: 1.8;
+            border-left: 2px solid var(--color-primary);
+            padding-left: 20px;
+        }
+
+        .cover-footer {
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            opacity: 0.4;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .form-panel {
+            flex: 1;
+            background: #fff;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow-y: auto;
+        }
+
+        .form-header {
+            margin-bottom: 40px;
+        }
+        .form-header .volume-num {
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+            color: var(--color-primary);
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .form-header h2 {
+            font-family: var(--font-display);
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .input-item {
+            margin-bottom: 24px;
+            position: relative;
+        }
+        .input-item label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 700;
+            color: var(--color-ink);
+            display: block;
+            margin-bottom: 10px;
+        }
+        .input-item input {
+            width: 100%;
+            border: none;
+            border-bottom: 2px solid #e7e5e4;
+            padding: 10px 0;
+            font-size: 1rem;
+            font-family: var(--font-body);
+            transition: all 0.3s ease;
+            background: transparent;
+            outline: none;
+        }
+        .input-item input:focus {
+            border-bottom-color: var(--color-primary);
+        }
+        .input-item input::placeholder { color: #d6d3d1; }
+
+        .password-toggle {
+            position: absolute;
+            right: 0;
+            bottom: 10px;
+            background: none;
+            border: none;
+            color: #d6d3d1;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .password-toggle:hover { color: var(--color-ink); }
+
+        .btn-editorial {
+            background: var(--color-ink);
+            color: #fff;
+            border: none;
+            padding: 20px;
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            text-decoration: none;
+            width: 100%;
+        }
+        .btn-editorial:hover {
+            background: var(--color-primary);
+            padding-right: 30px;
+            color: #fff;
+        }
+        .btn-editorial i { font-size: 0.9rem; transition: transform 0.3s; }
+        .btn-editorial:hover i { transform: translateX(5px); }
+
+        .register-tip {
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: var(--color-text-secondary);
+            text-align: center;
+        }
+        .register-tip a {
+            color: var(--color-ink);
+            font-weight: 700;
+            text-decoration: none;
+            border-bottom: 2px solid var(--color-accent);
+            padding-bottom: 2px;
+            margin-left: 5px;
+            transition: all 0.3s;
+        }
+        .register-tip a:hover {
+            background: var(--color-accent);
+            color: #fff;
+        }
+
+        .alert-editorial {
+            background: var(--color-bg-warm);
+            border-left: 4px solid var(--color-primary);
+            padding: 15px 20px;
+            margin-bottom: 30px;
+            font-size: 0.88rem;
+            animation: slideIn 0.4s ease;
+        }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        @media (max-width: 992px) {
+            .main-wrapper { flex-direction: column; max-width: 500px; height: auto; min-height: unset; }
+            .cover-panel { padding: 40px; min-height: 280px; }
+            .main-headline h1 { font-size: 3rem; }
+            .form-panel { padding: 40px; }
+            .bg-text { font-size: 30vw; }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 0; }
+            .main-wrapper { border-radius: 0; }
+            .cover-panel { padding: 30px; }
+            .main-headline h1 { font-size: 2.2rem; }
+            .form-panel { padding: 30px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="editorial-bg">
+        <div class="bg-text bg-text-1">HOME</div>
+        <div class="bg-text bg-text-2">SECURE</div>
+    </div>
+
+    <div class="main-wrapper">
+        <div class="cover-panel">
+            <div class="journal-meta">
+                <span>Issue Vol. 04</span>
+                <span>2026 Spring</span>
+            </div>
+
+            <div class="main-headline">
+                <h1>JOIN<br>US.</h1>
+                <span class="chinese-title">开启家庭安全守护</span>
+            </div>
+
+            <div class="abstract-box">
+                加入智慧家庭安全网络，共同营造一个让家人安心、放心的理想居住空间。
+            </div>
+
+            <div class="cover-footer">
+                <span>NEW ACCOUNT REQUEST</span>
+                <span>© 2026 INTEL-MONITOR</span>
+            </div>
+        </div>
+
+        <div class="form-panel">
+            <div class="form-header">
+                <span class="volume-num">REG. Nº 0524</span>
+                <h2>创建您的访问权限</h2>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert-editorial">
+                            <i class="fas fa-info-circle me-2"></i> {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST">
+                <div class="input-item">
+                    <label>Username / 用户名</label>
+                    <input type="text" name="username" placeholder="设置您的用户名" required>
+                </div>
+
+                <div class="input-item">
+                    <label>Password / 密码</label>
+                    <input type="password" name="password" id="regPassword" placeholder="设置您的访问密钥" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('regPassword', this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+
+                <div class="input-item">
+                    <label>Confirm Password / 确认密码</label>
+                    <input type="password" name="confirm_password" id="regConfirmPassword" placeholder="再次输入访问密钥" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('regConfirmPassword', this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+
+                <button type="submit" class="btn-editorial">
+                    <span>REGISTER / 提交申请</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <div class="register-tip">
+                已有访问权限？<a href="{{ url_for('auth.login') }}">点击此处登录</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        }
+    </script>
+</body>
+</html>

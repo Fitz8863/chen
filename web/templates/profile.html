@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+
+{% block title %}个人资料 - 家庭智能监控系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .avatar-section {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 30px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-md);
+    }
+
+    .avatar-wrapper {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 15px;
+    }
+
+    .avatar-img {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid var(--primary);
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .avatar-img:hover {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+
+    .avatar-overlay {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 36px;
+        height: 36px;
+        background: var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        cursor: pointer;
+        border: 2px solid var(--card-bg);
+        transition: all 0.3s ease;
+    }
+
+    .avatar-overlay:hover {
+        background: var(--primary-dark);
+        transform: scale(1.1);
+    }
+
+    .avatar-overlay i {
+        font-size: 14px;
+    }
+
+    .nickname-display {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--text-main);
+        margin-bottom: 5px;
+    }
+
+    .username-display {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .profile-section {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-md);
+    }
+
+    .section-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-header i {
+        color: var(--primary);
+    }
+
+    .profile-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+
+    .profile-item:last-child {
+        border-bottom: none;
+    }
+
+    .profile-item:hover {
+        background: rgba(251, 146, 60, 0.05);
+    }
+
+    .profile-item-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .profile-item-left i {
+        color: var(--text-muted);
+        width: 20px;
+        text-align: center;
+    }
+
+    .profile-item-label {
+        font-size: 0.95rem;
+        color: var(--text-main);
+    }
+
+    .profile-item-value {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .profile-item-value i {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+    }
+
+    .modal-content {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+    }
+
+    .modal-header {
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-footer {
+        border-top: 1px solid var(--border-color);
+    }
+
+    .form-control {
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+
+    .form-control:focus {
+        background: var(--bg-color);
+        border-color: var(--primary);
+        color: var(--text-main);
+        box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.15);
+    }
+
+    .form-control::placeholder {
+        color: var(--text-muted);
+    }
+
+    .btn-close {
+        filter: invert(1);
+    }
+
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+    }
+
+    .custom-toast {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 12px 20px;
+        color: var(--text-main);
+        box-shadow: var(--shadow-lg);
+        animation: slideInRight 0.3s ease;
+    }
+
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .crop-container {
+        height: 350px;
+        background: #000;
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+
+    .crop-container img {
+        max-width: 100%;
+        display: block;
+    }
+
+    .crop-preview-circle {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 2px solid var(--primary);
+        margin: 0 auto;
+    }
+</style>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="avatar-section">
+        <div class="avatar-wrapper">
+            <img id="avatarPreview" src="{{ url_for('static', filename=current_user.avatar) if current_user.avatar else 'https://ui-avatars.com/api/?name=' + (current_user.nickname or current_user.username) + '&background=fb923c&color=fff&size=240' }}" class="avatar-img" alt="头像">
+            <div class="avatar-overlay" onclick="document.getElementById('avatarInput').click()">
+                <i class="fas fa-camera"></i>
+            </div>
+            <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display: none;" onchange="previewAvatar(this)">
+        </div>
+        <div class="nickname-display" id="nicknameDisplay">{{ current_user.nickname or current_user.username }}</div>
+        <div class="username-display">ID: {{ current_user.id }} | @{{ current_user.username }}</div>
+    </div>
+
+    <div class="profile-section">
+        <div class="section-header">
+            <i class="fas fa-user-edit"></i>
+            基本信息
+        </div>
+        <div class="profile-item" onclick="showEditNickname()">
+            <div class="profile-item-left">
+                <i class="fas fa-signature"></i>
+                <span class="profile-item-label">昵称</span>
+            </div>
+            <div class="profile-item-value">
+                <span id="nicknameValue">{{ current_user.nickname or '未设置' }}</span>
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </div>
+        <div class="profile-item" onclick="showEditUsername()">
+            <div class="profile-item-left">
+                <i class="fas fa-at"></i>
+                <span class="profile-item-label">用户名</span>
+            </div>
+            <div class="profile-item-value">
+                <span id="usernameValue">{{ current_user.username }}</span>
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-section">
+        <div class="section-header">
+            <i class="fas fa-lock"></i>
+            账号安全
+        </div>
+        <div class="profile-item" onclick="showChangePassword()">
+            <div class="profile-item-left">
+                <i class="fas fa-key"></i>
+                <span class="profile-item-label">修改密码</span>
+            </div>
+            <div class="profile-item-value">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑昵称弹窗 -->
+<div class="modal fade" id="nicknameModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="fas fa-signature me-2" style="color: var(--primary);"></i>修改昵称</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="nicknameInput" class="form-control" placeholder="请输入新昵称" maxlength="20">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="saveNickname()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑用户名弹窗 -->
+<div class="modal fade" id="usernameModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="fas fa-at me-2" style="color: var(--primary);"></i>修改用户名</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="usernameInput" class="form-control" placeholder="请输入新用户名" maxlength="20">
+                <div class="form-text text-muted mt-2">用户名用于登录系统，修改后请使用新用户名登录</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="saveUsername()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal fade" id="passwordModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="fas fa-key me-2" style="color: var(--primary);"></i>修改密码</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small text-muted">原密码</label>
+                    <input type="password" id="oldPassword" class="form-control" placeholder="请输入原密码">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted">新密码</label>
+                    <input type="password" id="newPassword" class="form-control" placeholder="请输入新密码（至少6位）">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted">确认新密码</label>
+                    <input type="password" id="confirmPassword" class="form-control" placeholder="请再次输入新密码">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="savePassword()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 头像裁剪弹窗 -->
+<div class="modal fade" id="cropModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="fas fa-crop-alt me-2" style="color: var(--primary);"></i>裁剪头像</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-8">
+                        <div class="crop-container">
+                            <img id="cropImage" src="">
+                        </div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <p class="text-muted small mb-3">预览</p>
+                        <div class="crop-preview-circle">
+                            <img id="cropPreview" src="" style="width:100%;height:100%;object-fit:cover;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="confirmCrop()"><i class="fas fa-check me-1"></i>确认裁剪</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast mb-2';
+    toast.style.borderLeft = type === 'success' ? '4px solid #10b981' : '4px solid #ef4444';
+    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle text-success' : 'exclamation-circle text-danger'} me-2"></i>${message}`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function showEditNickname() {
+    document.getElementById('nicknameInput').value = document.getElementById('nicknameValue').textContent === '未设置' ? '' : document.getElementById('nicknameValue').textContent;
+    new bootstrap.Modal(document.getElementById('nicknameModal')).show();
+}
+
+function showEditUsername() {
+    document.getElementById('usernameInput').value = document.getElementById('usernameValue').textContent;
+    new bootstrap.Modal(document.getElementById('usernameModal')).show();
+}
+
+function showChangePassword() {
+    document.getElementById('oldPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    new bootstrap.Modal(document.getElementById('passwordModal')).show();
+}
+
+function saveNickname() {
+    const nickname = document.getElementById('nicknameInput').value.trim();
+    fetch('/profile/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({nickname: nickname, username: ''})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.message) {
+            document.getElementById('nicknameValue').textContent = nickname || '未设置';
+            document.getElementById('nicknameDisplay').textContent = nickname || document.getElementById('usernameValue').textContent;
+            bootstrap.Modal.getInstance(document.getElementById('nicknameModal')).hide();
+            showToast('昵称修改成功');
+        } else {
+            showToast(data.error || '修改失败', 'error');
+        }
+    });
+}
+
+function saveUsername() {
+    const username = document.getElementById('usernameInput').value.trim();
+    if (!username) {
+        showToast('用户名不能为空', 'error');
+        return;
+    }
+    fetch('/profile/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({nickname: '', username: username})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.message) {
+            document.getElementById('usernameValue').textContent = username;
+            bootstrap.Modal.getInstance(document.getElementById('usernameModal')).hide();
+            showToast('用户名修改成功，请使用新用户名重新登录', 'success');
+            setTimeout(() => window.location.href = '/logout', 1500);
+        } else {
+            showToast(data.error || '修改失败', 'error');
+        }
+    });
+}
+
+function savePassword() {
+    const oldPassword = document.getElementById('oldPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+        showToast('请填写完整', 'error');
+        return;
+    }
+
+    fetch('/profile/change-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({old_password: oldPassword, new_password: newPassword, confirm_password: confirmPassword})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.message) {
+            bootstrap.Modal.getInstance(document.getElementById('passwordModal')).hide();
+            showToast('密码修改成功');
+        } else {
+            showToast(data.error || '修改失败', 'error');
+        }
+    });
+}
+
+function previewAvatar(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('图片大小不能超过 5MB', 'error');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        document.getElementById('cropImage').src = e.target.result;
+        document.getElementById('cropPreview').src = e.target.result;
+        const modal = new bootstrap.Modal(document.getElementById('cropModal'));
+        modal.show();
+        document.getElementById('cropModal').addEventListener('shown.bs.modal', () => {
+            if (cropper) cropper.destroy();
+            const image = document.getElementById('cropImage');
+            cropper = new Cropper(image, {
+                aspectRatio: 1,
+                viewMode: 2,
+                dragMode: 'move',
+                autoCropArea: 0.7,
+                movable: true,
+                zoomable: true,
+                zoomOnWheel: true,
+                zoomOnTouch: true,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+                responsive: true,
+                guides: true,
+                center: true,
+                highlight: true,
+                background: true,
+                crop(event) {
+                    const canvas = cropper.getCroppedCanvas({ width: 240, height: 240 });
+                    document.getElementById('cropPreview').src = canvas.toDataURL('image/jpeg');
+                }
+            });
+        }, { once: true });
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+}
+
+let cropper = null;
+
+function confirmCrop() {
+    if (!cropper) return;
+    cropper.getCroppedCanvas({ width: 240, height: 240 }).toBlob((blob) => {
+        const formData = new FormData();
+        formData.append('avatar', blob, 'avatar.jpg');
+        fetch('/profile/upload-avatar', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.message) {
+                document.getElementById('avatarPreview').src = data.avatar_url + '?t=' + Date.now();
+                showToast('头像上传成功');
+                bootstrap.Modal.getInstance(document.getElementById('cropModal')).hide();
+                cropper.destroy();
+                cropper = null;
+            } else {
+                showToast(data.error || '上传失败', 'error');
+            }
+        })
+        .catch(() => showToast('上传失败', 'error'));
+    }, 'image/jpeg', 0.9);
+}
+</script>
+{% endblock %}

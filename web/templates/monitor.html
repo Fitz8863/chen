@@ -1,0 +1,631 @@
+{% extends "base.html" %}
+
+{% block title %}实时监控 - 家庭智能监控系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .monitor-grid {
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* 居中显示 */
+        gap: 24px;
+        padding-bottom: 30px;
+    }
+    
+    /* 监控卡片 - 自适应主题，限制最大宽度 */
+    .monitor-card {
+        width: 100%;
+        max-width: 800px; /* 限制最大宽度，防止满屏拉伸 */
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+        color: var(--text-main);
+    }
+    .monitor-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--primary-light);
+    }
+    
+    /* 卡片头部 - 保持品牌渐变色，文字始终为白色 */
+    .monitor-header {
+        background: linear-gradient(135deg, #c2410c 0%, #9a3412 100%);
+        color: #ffffff;
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    /* 摄像头信息栏 - 自适应主题 */
+    .camera-info-bar {
+        background: var(--bg-color);
+        color: var(--text-muted);
+        padding: 8px 20px;
+        font-size: 0.85rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .camera-info-bar .resolution {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Courier New', monospace;
+        color: var(--primary);
+        font-weight: 600;
+    }
+    .camera-info-bar .resolution i {
+        font-size: 0.8rem;
+    }
+    
+    /* 视频主体 - 始终保持黑底以凸显视频画面 */
+    .monitor-body {
+        padding: 0;
+        background: #000;
+        min-height: 400px; /* 增加一点高度，适应一列布局 */
+        position: relative;
+    }
+    .monitor-body img {
+        width: 100%;
+        height: 100%;
+        min-height: 400px;
+        object-fit: contain;
+        background: #000;
+    }
+    
+    /* 底部统计栏 - 自适应主题 */
+    .monitor-stats {
+
+        display: flex;
+        gap: 20px;
+        padding: 15px 20px;
+        background: var(--card-bg);
+        border-top: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+    .monitor-stats span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: var(--text-muted);
+        grid-column: 1 / -1;
+        background: var(--card-bg);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+    }
+    .empty-state i {
+        font-size: 5rem;
+        margin-bottom: 20px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        opacity: 0.6;
+    }
+    .empty-state h5 {
+        color: var(--text-main);
+        font-weight: 600;
+    }
+    .empty-state p {
+        color: var(--text-muted);
+    }
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(16, 185, 129, 0.2) !important;
+        color: #10b981 !important; /* 始终保持绿色 */
+    }
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981 !important; /* 始终保持绿色点 */
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    /* VLM 分析结果面板 */
+    .vlm-panel {
+        padding: 12px 16px;
+        border-top: 1px solid var(--border-color);
+        background: var(--card-bg);
+        display: none;
+        transition: all 0.3s ease;
+    }
+    .vlm-panel.visible {
+        display: block;
+    }
+    .vlm-panel .vlm-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .vlm-panel .vlm-header i {
+        font-size: 0.9rem;
+    }
+    .vlm-panel .vlm-body {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: var(--text-muted);
+    }
+    .vlm-panel.vlm-danger {
+        border-left: 4px solid #ef4444;
+    }
+    .vlm-panel.vlm-danger .vlm-header {
+        color: #ef4444;
+    }
+    .vlm-panel.vlm-safe {
+        border-left: 4px solid #10b981;
+    }
+    .vlm-panel.vlm-safe .vlm-header {
+        color: #10b981;
+    }
+    .vlm-panel .vlm-timer {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-align: right;
+        margin-top: 4px;
+        opacity: 0.6;
+    }
+    {% if not current_user.is_authenticated %}
+    .alert-info {
+        background: var(--primary-subtle);
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 20px;
+        color: var(--primary-dark);
+    }
+    .alert-info a {
+        color: var(--accent);
+        font-weight: 600;
+    }
+    {% endif %}
+    @media (max-width: 768px) {
+        .monitor-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if not current_user.is_authenticated %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    请 <a href="{{ url_for('auth.login') }}">登录</a> 后查看实时监控画面
+</div>
+{% else %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex gap-3 align-items-center flex-grow-1 me-4">
+        <div class="input-group input-group-sm" style="max-width: 400px;">
+            <span class="input-group-text bg-card border-color"><i class="fas fa-link text-muted"></i></span>
+            <input type="text" id="newStreamUrl" class="form-control bg-card border-color text-main" placeholder="输入 RTSP/HTTP 视频流地址">
+            <input type="text" id="newStreamName" class="form-control bg-card border-color text-main" placeholder="摄像头名称" style="max-width: 120px;">
+            <button class="btn btn-primary" onclick="addNewCamera()">添加源</button>
+        </div>
+        <button id="globalAudioToggle" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" onclick="toggleGlobalAudio()" style="background: var(--card-bg); color: var(--text-main); border-color: var(--border-color); transition: all 0.3s ease;">
+            <i class="fas fa-volume-mute me-2" id="audioIcon"></i><span id="audioText">开启现场环境音</span>
+        </button>
+    </div>
+</div>
+
+<div class="monitor-grid" id="monitorGrid">
+    <div id="emptyState" class="empty-state">
+        <i class="fas fa-video-slash"></i>
+        <h5 id="emptyStateTitle">暂无视频流</h5>
+        <p id="emptyStateDesc">请在上方输入框添加视频源，或在 cameras.json 中配置监控设备</p>
+    </div>
+</div>
+{% endif %}
+
+{% block extra_js %}
+<script>
+    let activeCameras = new Map();
+    let pollInterval = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!document.getElementById('monitorGrid')) return;
+        
+        syncCameras();
+        pollInterval = setInterval(syncCameras, 5000);
+        setInterval(pollVlmStatus, VLM_POLL_INTERVAL);
+        
+        setTimeout(checkAudioStatus, 1500);
+    });
+
+    function addNewCamera() {
+        const url = document.getElementById('newStreamUrl').value;
+        const name = document.getElementById('newStreamName').value || '动态视频源';
+        
+        if (!url) {
+            alert('请输入视频流地址');
+            return;
+        }
+        
+        fetch('/settings/api/cameras/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, url: url})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.message) {
+                document.getElementById('newStreamUrl').value = '';
+                document.getElementById('newStreamName').value = '';
+                syncCameras();
+            } else {
+                alert('添加失败: ' + (data.error || '未知错误'));
+            }
+        })
+        .catch(err => alert('请求失败: ' + err));
+    }
+
+    function syncCameras() {
+        fetch('/api/cameras')
+            .then(response => response.json())
+            .then(data => {
+                const cameras = data.cameras || [];
+                const emptyState = document.getElementById('emptyState');
+                const emptyStateTitle = document.getElementById('emptyStateTitle');
+                const emptyStateDesc = document.getElementById('emptyStateDesc');
+                const monitorGrid = document.getElementById('monitorGrid');
+                
+                // 追踪当前响应中的 ID
+                const currentIds = new Set(cameras.map(c => c.id));
+
+                // 1. 移除已掉线的摄像头
+                for (let [id, card] of activeCameras) {
+                    if (!currentIds.has(id)) {
+                        card.remove();
+                        activeCameras.delete(id);
+                        fetch(`/settings/api/audio/control/${id}`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({action: 'stop'})
+                        }).catch(() => {});
+                    }
+                }
+
+                // 2. 添加或更新摄像头
+                if (cameras.length === 0) {
+                    emptyState.style.display = 'block';
+                    emptyStateTitle.innerText = '暂无视频流';
+                    emptyStateDesc.innerText = '请在上方输入框添加视频源，或在 cameras.json 中配置监控设备';
+                } else {
+                    emptyState.style.display = 'none';
+                    
+                    cameras.forEach(camera => {
+                        if (!activeCameras.has(camera.id)) {
+                            const card = createCameraCard(camera.id, camera.name, camera.webrtc_url);
+                            monitorGrid.appendChild(card);
+                            activeCameras.set(camera.id, card);
+                            
+                            if (isGlobalAudioEnabled) {
+                                fetch(`/settings/api/audio/control/${camera.id}`, {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({action: 'play'})
+                                }).catch(() => {});
+                            }
+                        } else {
+                            updateCameraCard(camera.id, camera.name, camera.webrtc_url);
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('获取摄像头列表失败:', error);
+            });
+    }
+                }
+
+                // 2. 添加或更新摄像头
+                if (cameras.length === 0) {
+                    emptyState.style.display = 'block';
+                    emptyState.querySelector('i').className = 'fas fa-video-slash';
+                    emptyStateTitle.innerText = '暂无视频流';
+                    emptyStateDesc.innerText = '请在 cameras.json 中配置摄像头信息';
+                } else {
+                    emptyState.style.display = 'none';
+                    
+                    cameras.forEach(camera => {
+                        if (!activeCameras.has(camera.id)) {
+                            const card = createCameraCard(camera.id, camera.name, camera.webrtc_url);
+                            monitorGrid.appendChild(card);
+                            activeCameras.set(camera.id, card);
+                            
+                            if (isGlobalAudioEnabled) {
+                                fetch(`/settings/api/audio/control/${camera.id}`, {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({action: 'play'})
+                                }).catch(() => {});
+                            }
+                        } else {
+                            updateCameraCard(camera.id, camera.name, camera.webrtc_url);
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('获取摄像头列表失败:', error);
+            });
+    }
+                    }
+                });
+            })
+            .catch(() => {});
+    }
+
+    function syncCameras() {
+        fetch('/api/cameras')
+            .then(response => response.json())
+            .then(data => {
+                const cameras = data.cameras || [];
+                const mqttConnected = data.mqtt_connected;
+                const emptyState = document.getElementById('emptyState');
+                const emptyStateTitle = document.getElementById('emptyStateTitle');
+                const emptyStateDesc = document.getElementById('emptyStateDesc');
+                const monitorGrid = document.getElementById('monitorGrid');
+                const intercomBar = document.querySelector('.intercom-bar');
+                
+                // 根据连接状态显示/隐藏对讲控制栏
+                if (intercomBar) {
+                    intercomBar.style.display = mqttConnected ? 'flex' : 'none';
+                }
+                
+                if (!mqttConnected) {
+                    // MQTT未连接状态
+                    activeCameras.forEach(card => card.remove());
+                    activeCameras.clear();
+                    emptyState.style.display = 'block';
+                    emptyState.querySelector('i').className = 'fas fa-server';
+                    emptyStateTitle.innerText = '请先连接服务器';
+                    // emptyStateDesc.innerText = '前往“系统设置”连接远程服务器以获取实时监控';
+                    return;
+                }
+
+                // 追踪当前响应中的 ID
+                const currentIds = new Set(cameras.map(c => c.id));
+
+                // 1. 移除已掉线的摄像头
+                for (let [id, card] of activeCameras) {
+                    if (!currentIds.has(id)) {
+                        card.remove();
+                        activeCameras.delete(id);
+                        // 当摄像头离线时，自动停止后台对应的 ffplay 进程
+                        fetch(`/settings/api/audio/control/${id}`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({action: 'stop'})
+                        }).catch(() => {});
+                    }
+                }
+
+                // 2. 添加或更新摄像头
+                if (cameras.length === 0) {
+                    emptyState.style.display = 'block';
+                    emptyState.querySelector('i').className = 'fas fa-video-slash';
+                    emptyStateTitle.innerText = '暂无视频流';
+                    emptyStateDesc.innerText = '服务器已连接，正在等待设备上线并发送心跳包数据...';
+                } else {
+                    emptyState.style.display = 'none';
+                    
+                    cameras.forEach(camera => {
+                        if (!activeCameras.has(camera.id)) {
+                            // 发现新上线的设备
+                            const card = createCameraCard(camera.id, camera.name, camera.webrtc_url);
+                            monitorGrid.appendChild(card);
+                            activeCameras.set(camera.id, card);
+                            
+                            // 尝试为新设备同步开启声音
+                            if (isGlobalAudioEnabled) {
+                                fetch(`/settings/api/audio/control/${camera.id}`, {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({action: 'play'})
+                                }).catch(() => {});
+                            }
+                        } else {
+                            // 如果信息有变化则更新
+                            updateCameraCard(camera.id, camera.name, camera.webrtc_url);
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('获取摄像头列表失败:', error);
+            });
+    }
+
+    function createCameraCard(id, name, webrtcUrl) {
+        const card = document.createElement('div');
+        card.className = 'monitor-card';
+        card.id = `camera-card-${id}`;
+        
+        card.innerHTML = `
+            <div class="monitor-header">
+                <span class="camera-name"><i class="fas fa-map-marker-alt me-2"></i>${name}</span>
+                <span class="status-badge status-normal">
+                    <span class="status-dot"></span>activate
+                </span>
+            </div>
+            <div class="camera-info-bar" id="info-bar-${id}">
+                <span class="resolution">
+                    <i class="fas fa-desktop"></i>
+                    <span class="resolution-text">等待数据...</span>
+                </span>
+            </div>
+            <div class="monitor-body">
+                <img src="/settings/api/video/stream/${id}" data-camera-id="${id}" onerror="handleVideoError('${id}')"></img>
+            </div>
+            <div class="monitor-stats">
+                <div class="d-flex justify-content-between w-100 align-items-center">
+                    <span><i class="fas fa-video"></i> 远程视频流</span>
+                </div>
+            </div>
+            <div class="vlm-panel" id="vlm-panel-${id}">
+                <div class="vlm-header">
+                    <i class="fas fa-robot"></i>
+                    <span class="vlm-status-text">AI 行为分析</span>
+                </div>
+                <div class="vlm-body" id="vlm-body-${id}"></div>
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    function handleVideoError(id) {
+        console.error('视频流加载失败:', id);
+    }
+
+    function updateCameraCard(id, name, webrtcUrl) {
+        const card = activeCameras.get(id);
+        if (!card) return;
+
+        const nameEl = card.querySelector('.camera-name');
+        if (nameEl && nameEl.innerText !== name) {
+            nameEl.innerHTML = `<i class="fas fa-map-marker-alt me-2"></i>${name}`;
+        }
+    }
+
+    // --- VLM 分析结果面板管理 ---
+    const VLM_POLL_INTERVAL = 2000;  // 2秒轮询一次
+    const VLM_AUTO_HIDE_TIMEOUT = 12; // 超过12秒无更新则隐藏面板
+
+    function pollVlmStatus() {
+        activeCameras.forEach((_, id) => {
+            fetch(`/settings/api/vlm/status/${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    const panel = document.getElementById(`vlm-panel-${id}`);
+                    const body = document.getElementById(`vlm-body-${id}`);
+                    
+                    if (!panel || !body) return;
+
+                    if (data.active && data.result) {
+                        const isViolent = data.result.is_violent || false;
+                        const desc = data.result.description || '暂无描述';
+                        const threatLevel = data.result.threat_level || 'low';
+                        const numPeople = data.result.num_people_involved || 0;
+                        const evidence = data.result.evidence || '';
+
+                        panel.className = `vlm-panel visible ${isViolent ? 'vlm-danger' : 'vlm-safe'}`;
+                        
+                        const icon = isViolent ? '⚠️' : '✅';
+                        const statusText = isViolent ? '检测到异常行为!' : '画面正常';
+                        const threatBadge = isViolent 
+                            ? `<span style="font-size:0.75rem;padding:2px 8px;border-radius:10px;background:#ef4444;color:#fff;">${threatLevel === 'high' ? '高危' : threatLevel === 'medium' ? '中危' : '低危'}</span>`
+                            : `<span style="font-size:0.75rem;padding:2px 8px;border-radius:10px;background:#10b981;color:#fff;">安全</span>`;
+                        
+                        body.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <span>${icon} <strong>${statusText}</strong></span>
+                                ${threatBadge}
+                            </div>
+                            <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px;">${desc}</div>
+                            ${numPeople > 0 ? `<div style="font-size:0.8rem;color:var(--text-muted);">涉及人数: <strong>${numPeople}</strong></div>` : ''}
+                            ${evidence ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;opacity:0.7;">证据: ${evidence}</div>` : ''}
+                        `;
+                        
+                        const elapsed = data.elapsed || 0;
+                        if (elapsed > VLM_AUTO_HIDE_TIMEOUT) {
+                            panel.classList.remove('visible');
+                        }
+                    } else {
+                        panel.classList.remove('visible');
+                    }
+                })
+                .catch(() => {});
+        });
+    }
+
+    // --- 音频流管理逻辑 (服务器端直出方案) ---
+    let isGlobalAudioEnabled = false;
+
+    // 定期检查服务器后台音频播放状态，保持 UI 同步
+    function checkAudioStatus() {
+        if (activeCameras.size === 0) return;
+        
+        // 假设只对第一个激活的摄像头做状态同步（如果是多路可进一步扩展）
+        const firstCameraId = activeCameras.keys().next().value;
+        
+        fetch(`/settings/api/audio/control/${firstCameraId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'status'})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.playing !== isGlobalAudioEnabled) {
+                isGlobalAudioEnabled = data.playing;
+                updateAudioBtnUI();
+            }
+        })
+        .catch(() => {});
+    }
+
+    function toggleGlobalAudio() {
+        isGlobalAudioEnabled = !isGlobalAudioEnabled;
+        updateAudioBtnUI();
+        
+        const action = isGlobalAudioEnabled ? 'play' : 'stop';
+        
+        activeCameras.forEach((_, id) => {
+            fetch(`/settings/api/audio/control/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: action})
+            }).catch(e => console.error('音频控制失败:', e));
+        });
+    }
+
+    function updateAudioBtnUI() {
+        const icon = document.getElementById('audioIcon');
+        const text = document.getElementById('audioText');
+        const btn = document.getElementById('globalAudioToggle');
+
+        if (isGlobalAudioEnabled) {
+            icon.className = 'fas fa-volume-up text-success';
+            text.innerText = '正在监听环境音';
+            btn.style.borderColor = 'var(--success)';
+            btn.style.color = 'var(--success)';
+        } else {
+            icon.className = 'fas fa-volume-mute';
+            text.innerText = '开启现场环境音';
+            btn.style.borderColor = 'var(--border-color)';
+            btn.style.color = 'var(--text-main)';
+        }
+    }
+
+    window.onbeforeunload = function() {
+        if (pollInterval) clearInterval(pollInterval);
+        // 注意：不在这里调用 stop，保证服务器后台一直播放，直到手动关闭
+    };
+</script>
+{% endblock %}
+{% endblock %}

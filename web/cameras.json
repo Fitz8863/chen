@@ -1,0 +1,11 @@
+{
+    "cameras": [
+        {
+            "id": "001",
+            "name": "摄像头 001",
+            "location": "西门围栏",
+            "rtsp_url": "",
+            "http_url": ""
+        }
+    ]
+}
