@@ -21,15 +21,15 @@ MAIL_DEFAULT_SENDER='3189801930@qq.com'
 
 
 # YOLO 推理配置
-YOLO_MODEL_PATH = 'model/yolo26n.onnx'
-YOLO_CONF_THRESHOLD = 0.65
+YOLO_MODEL_PATH = 'model/yolo26n_openvino_model'
+YOLO_CONF_THRESHOLD = 0.25
 YOLO_IOU_THRESHOLD = 0.45
 YOLO_DEVICE = 'cpu'
 YOLO_IMG_SIZE = 640
-YOLO_QUEUE_SIZE = 4  # 推理队列深度，1为极致实时，增加可提高流畅度但会增加延迟
+YOLO_QUEUE_SIZE = 1  # 推理队列深度，1为极致实时，增加可提高流畅度但会增加延迟
 
 # 多模态大模型 (VLM) 暴力行为分析配置
-VLM_ENABLED = True  # 默认为 False，你可以手动改为 True 开启大模型联动分析
+VLM_ENABLED = False  # 默认为 False，你可以手动改为 True 开启大模型联动分析
 VLM_BACKEND = 'openai'  # 可选: 'ollama' 或 'openai' (后者兼容几乎所有商用云端 API)
 VLM_API_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'  # api地址
 VLM_API_KEY = 'sk-41fd6c7956c1414ba4c1662cb07ad846'  # OpenAI 等云端大模型需要的 API Key，Ollama 本地部署可留空

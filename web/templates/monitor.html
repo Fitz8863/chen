@@ -256,33 +256,6 @@
         setTimeout(checkAudioStatus, 1500);
     });
 
-    function addNewCamera() {
-        const url = document.getElementById('newStreamUrl').value;
-        const name = document.getElementById('newStreamName').value || '动态视频源';
-        
-        if (!url) {
-            alert('请输入视频流地址');
-            return;
-        }
-        
-        fetch('/settings/api/cameras/add', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: name, url: url})
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.message) {
-                document.getElementById('newStreamUrl').value = '';
-                document.getElementById('newStreamName').value = '';
-                syncCameras();
-            } else {
-                alert('添加失败: ' + (data.error || '未知错误'));
-            }
-        })
-        .catch(err => alert('请求失败: ' + err));
-    }
-
     function syncCameras() {
         fetch('/api/cameras')
             .then(response => response.json())
@@ -293,121 +266,6 @@
                 const emptyStateDesc = document.getElementById('emptyStateDesc');
                 const monitorGrid = document.getElementById('monitorGrid');
                 
-                // 追踪当前响应中的 ID
-                const currentIds = new Set(cameras.map(c => c.id));
-
-                // 1. 移除已掉线的摄像头
-                for (let [id, card] of activeCameras) {
-                    if (!currentIds.has(id)) {
-                        card.remove();
-                        activeCameras.delete(id);
-                        fetch(`/settings/api/audio/control/${id}`, {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({action: 'stop'})
-                        }).catch(() => {});
-                    }
-                }
-
-                // 2. 添加或更新摄像头
-                if (cameras.length === 0) {
-                    emptyState.style.display = 'block';
-                    emptyStateTitle.innerText = '暂无视频流';
-                    emptyStateDesc.innerText = '请在上方输入框添加视频源，或在 cameras.json 中配置监控设备';
-                } else {
-                    emptyState.style.display = 'none';
-                    
-                    cameras.forEach(camera => {
-                        if (!activeCameras.has(camera.id)) {
-                            const card = createCameraCard(camera.id, camera.name, camera.webrtc_url);
-                            monitorGrid.appendChild(card);
-                            activeCameras.set(camera.id, card);
-                            
-                            if (isGlobalAudioEnabled) {
-                                fetch(`/settings/api/audio/control/${camera.id}`, {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({action: 'play'})
-                                }).catch(() => {});
-                            }
-                        } else {
-                            updateCameraCard(camera.id, camera.name, camera.webrtc_url);
-                        }
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('获取摄像头列表失败:', error);
-            });
-    }
-                }
-
-                // 2. 添加或更新摄像头
-                if (cameras.length === 0) {
-                    emptyState.style.display = 'block';
-                    emptyState.querySelector('i').className = 'fas fa-video-slash';
-                    emptyStateTitle.innerText = '暂无视频流';
-                    emptyStateDesc.innerText = '请在 cameras.json 中配置摄像头信息';
-                } else {
-                    emptyState.style.display = 'none';
-                    
-                    cameras.forEach(camera => {
-                        if (!activeCameras.has(camera.id)) {
-                            const card = createCameraCard(camera.id, camera.name, camera.webrtc_url);
-                            monitorGrid.appendChild(card);
-                            activeCameras.set(camera.id, card);
-                            
-                            if (isGlobalAudioEnabled) {
-                                fetch(`/settings/api/audio/control/${camera.id}`, {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({action: 'play'})
-                                }).catch(() => {});
-                            }
-                        } else {
-                            updateCameraCard(camera.id, camera.name, camera.webrtc_url);
-                        }
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('获取摄像头列表失败:', error);
-            });
-    }
-                    }
-                });
-            })
-            .catch(() => {});
-    }
-
-    function syncCameras() {
-        fetch('/api/cameras')
-            .then(response => response.json())
-            .then(data => {
-                const cameras = data.cameras || [];
-                const mqttConnected = data.mqtt_connected;
-                const emptyState = document.getElementById('emptyState');
-                const emptyStateTitle = document.getElementById('emptyStateTitle');
-                const emptyStateDesc = document.getElementById('emptyStateDesc');
-                const monitorGrid = document.getElementById('monitorGrid');
-                const intercomBar = document.querySelector('.intercom-bar');
-                
-                // 根据连接状态显示/隐藏对讲控制栏
-                if (intercomBar) {
-                    intercomBar.style.display = mqttConnected ? 'flex' : 'none';
-                }
-                
-                if (!mqttConnected) {
-                    // MQTT未连接状态
-                    activeCameras.forEach(card => card.remove());
-                    activeCameras.clear();
-                    emptyState.style.display = 'block';
-                    emptyState.querySelector('i').className = 'fas fa-server';
-                    emptyStateTitle.innerText = '请先连接服务器';
-                    // emptyStateDesc.innerText = '前往“系统设置”连接远程服务器以获取实时监控';
-                    return;
-                }
-
                 // 追踪当前响应中的 ID
                 const currentIds = new Set(cameras.map(c => c.id));
 
@@ -430,7 +288,7 @@
                     emptyState.style.display = 'block';
                     emptyState.querySelector('i').className = 'fas fa-video-slash';
                     emptyStateTitle.innerText = '暂无视频流';
-                    emptyStateDesc.innerText = '服务器已连接，正在等待设备上线并发送心跳包数据...';
+                    emptyStateDesc.innerText = '请在 cameras.json 中配置摄像头信息';
                 } else {
                     emptyState.style.display = 'none';
                     

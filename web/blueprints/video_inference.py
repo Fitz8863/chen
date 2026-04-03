@@ -1,49 +1,38 @@
+import sys
+import os
+
+# 将项目根目录添加到 sys.path，以便正确导入 config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
+
+# 使用 config.xxx 访问配置，更加清晰且不会出现 NameError
+YOLO_MODEL_PATH = config.YOLO_MODEL_PATH
+YOLO_CONF_THRESHOLD = config.YOLO_CONF_THRESHOLD
+YOLO_IOU_THRESHOLD = config.YOLO_IOU_THRESHOLD
+YOLO_DEVICE = config.YOLO_DEVICE
+YOLO_IMG_SIZE = config.YOLO_IMG_SIZE
+YOLO_QUEUE_SIZE = config.YOLO_QUEUE_SIZE
+VLM_ENABLED = config.VLM_ENABLED
+VLM_BACKEND = config.VLM_BACKEND
+VLM_API_BASE = config.VLM_API_BASE
+VLM_API_KEY = config.VLM_API_KEY
+VLM_MODEL_NAME = config.VLM_MODEL_NAME
+VLM_FRAME_SKIP = config.VLM_FRAME_SKIP
+VLM_ANALYZE_INTERVAL = config.VLM_ANALYZE_INTERVAL
+VLM_PROMPT = config.VLM_PROMPT
+
 import cv2
 import threading
 import numpy as np
 import time
-import os
-import sys
 import subprocess
 import requests
 import base64
 import json
 from collections import defaultdict
 from queue import Queue, Empty, Full
+from urllib.parse import urlparse, urlunparse, quote
 
-# 引入项目配置
-try:
-    from config import (
-        YOLO_MODEL_PATH, 
-        YOLO_CONF_THRESHOLD, 
-        YOLO_IOU_THRESHOLD, 
-        YOLO_DEVICE, 
-        YOLO_IMG_SIZE,
-        YOLO_QUEUE_SIZE,
-        VLM_ENABLED,
-        VLM_BACKEND,
-        VLM_API_BASE,
-        VLM_API_KEY,
-        VLM_MODEL_NAME,
-        VLM_FRAME_SKIP,
-        VLM_ANALYZE_INTERVAL,
-        VLM_PROMPT
-    )
-except ImportError:
-    YOLO_MODEL_PATH = 'model/yolo26n_openvino_model/'
-    YOLO_CONF_THRESHOLD = 0.25
-    YOLO_IOU_THRESHOLD = 0.45
-    YOLO_DEVICE = 'cpu'
-    YOLO_IMG_SIZE = 640
-    YOLO_QUEUE_SIZE = 1
-    VLM_ENABLED = False
-    VLM_BACKEND = 'ollama'
-    VLM_API_BASE = 'http://localhost:11434/api/chat'
-    VLM_API_KEY = ''
-    VLM_MODEL_NAME = 'llava'
-    VLM_FRAME_SKIP = 30
-    VLM_ANALYZE_INTERVAL = 5.0
-    VLM_PROMPT = ""
 
 
 def _load_cameras_config():
@@ -59,6 +48,21 @@ def _load_cameras_config():
     except Exception as e:
         print(f"[Config] 加载 cameras.json 失败: {e}")
         return []
+
+def _format_rtsp_url(url, username, password):
+    if not username or not password:
+        return url
+    
+    parsed = urlparse(url)
+    if parsed.username or parsed.password:
+        return url 
+        
+    # 安全编码用户名和密码
+    safe_user = quote(str(username), safe='')
+    safe_pass = quote(str(password), safe='')
+    
+    netloc = f"{safe_user}:{safe_pass}@{parsed.netloc}"
+    return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
 
 third_party_path = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -95,7 +99,7 @@ class VideoInference:
     def _daemon_sync_loop(self):
         """全天候同步守护进程：根据 cameras.json 配置自动维持所有摄像头的拉流(视频+音频)和推理"""
         while self.running:
-            time.sleep(3.0)
+            # time.sleep(3.0)
             try:
                 active_cameras = _load_cameras_config()
                 if not active_cameras:
@@ -112,12 +116,16 @@ class VideoInference:
                     # --- 视频拉流自动启动 ---
                     video_url = cam.get('rtsp_url') or cam.get('http_url')
                     if video_url:
-                        self.get_or_create_capture(cam_id, video_url)
+                        # 注入凭据
+                        formatted_url = _format_rtsp_url(video_url, cam.get('username'), cam.get('password'))
+                        self.get_or_create_capture(cam_id, formatted_url)
                         
                     # --- 音频拉流自动启动 ---
                     audio_url = cam.get('voice_rtsp_url')
                     if audio_url and cam_id not in self.muted_cameras:
-                        self.get_or_create_audio(cam_id, audio_url)
+                        # 注入凭据
+                        formatted_audio_url = _format_rtsp_url(audio_url, cam.get('username'), cam.get('password'))
+                        self.get_or_create_audio(cam_id, formatted_audio_url)
                         
                 # 2. 清理已经离线（不在配置中）的设备资源
                 with self.lock:
@@ -287,8 +295,9 @@ class VideoInference:
         while not c_data['stop_event'].is_set():
             ret, frame = cap.read()
             if not ret:
-                time.sleep(0.01)
+                # time.sleep(0.01)
                 if not cap.isOpened():
+                    print(f"[Capture] 尝试重连: {url}")
                     cap.release()
                     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
                     cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(YOLO_IMG_SIZE))

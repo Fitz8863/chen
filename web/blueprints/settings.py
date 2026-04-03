@@ -24,10 +24,11 @@ def save_system_config(config):
 
 @settings_bp.before_request
 def before_request():
-    if not current_user.is_authenticated:
-        return login_manager.unauthorized()
+    # 视频流/音频流端点豁免认证（MJPEG 流无法携带 cookie）
     if request.path.startswith('/settings/api/video/stream/') or request.path.startswith('/settings/api/audio/stream/'):
         return
+    if not current_user.is_authenticated:
+        return login_manager.unauthorized()
     if request.path.startswith('/settings/api/system/config'):
         if not current_user.is_super_admin:
             abort(403)
@@ -57,30 +58,36 @@ def index():
 @settings_bp.route('/api/video/stream/<camera_id>')
 def video_stream(camera_id):
     """YOLO推理视频流接口"""
+    print(f"[VideoStream] 收到摄像头 {camera_id} 的请求")
     try:
-        from blueprints.video_inference import video_inference
+        from blueprints.video_inference import video_inference, _format_rtsp_url
         from blueprints.video_stream import load_cameras_config
 
         cameras = load_cameras_config()
         stream_url = None
         for cam in cameras:
             if str(cam.get('id', '')) == str(camera_id):
-                stream_url = cam.get('rtsp_url') or cam.get('http_url', '')
+                raw_url = cam.get('rtsp_url') or cam.get('http_url', '')
+                stream_url = _format_rtsp_url(raw_url, cam.get('username'), cam.get('password'))
                 break
 
         if not stream_url:
             return f"未找到摄像头 {camera_id} 的流地址", 404
 
+        print(f"[VideoStream] 准备为摄像头 {camera_id} 生成流", flush=True)
         video_inference.get_or_create_capture(camera_id, stream_url)
 
         def generate():
+            print(f"[VideoStream] 开始生成流数据: {camera_id}", flush=True)
+            last_frame = None
+            import time
             while True:
                 frame = video_inference.get_frame(camera_id)
-                if frame:
+                if frame and frame is not last_frame:
+                    last_frame = frame
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
                 else:
-                    import time
                     time.sleep(0.03)
 
         response = make_response(generate())

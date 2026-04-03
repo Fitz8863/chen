@@ -24,6 +24,10 @@ def init_db(app):
         if request.endpoint in allowed_routes:
             return
         
+        # 视频流/音频流端点豁免认证（MJPEG <img> 标签无法携带 cookie）
+        if request.path.startswith('/settings/api/video/stream/') or request.path.startswith('/settings/api/audio/stream/'):
+            return
+        
         from flask_login import current_user
         if not current_user.is_authenticated:
             # API 路由返回 JSON 错误
