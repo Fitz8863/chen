@@ -25,7 +25,7 @@ def save_system_config(config):
 @settings_bp.before_request
 def before_request():
     # 视频流/音频流端点豁免认证（MJPEG 流无法携带 cookie）
-    if request.path.startswith('/settings/api/video/stream/') or request.path.startswith('/settings/api/audio/stream/'):
+    if request.path.startswith('/settings/api/video/stream/'):
         return
     if not current_user.is_authenticated:
         return login_manager.unauthorized()
@@ -60,15 +60,15 @@ def video_stream(camera_id):
     """YOLO推理视频流接口"""
     print(f"[VideoStream] 收到摄像头 {camera_id} 的请求")
     try:
-        from blueprints.video_inference import video_inference, _format_rtsp_url
+        from blueprints.video_inference import video_inference, _format_camera_source
         from blueprints.video_stream import load_cameras_config
 
         cameras = load_cameras_config()
         stream_url = None
         for cam in cameras:
             if str(cam.get('id', '')) == str(camera_id):
-                raw_url = cam.get('rtsp_url') or cam.get('http_url', '')
-                stream_url = _format_rtsp_url(raw_url, cam.get('username'), cam.get('password'))
+                raw_source = cam.get('source', '')
+                stream_url = _format_camera_source(raw_source, cam.get('username'), cam.get('password'))
                 break
 
         if not stream_url:
@@ -81,10 +81,34 @@ def video_stream(camera_id):
             print(f"[VideoStream] 开始生成流数据: {camera_id}", flush=True)
             last_frame = None
             import time
+            import cv2
+            import numpy as np
+
+            fps_count = 0
+            fps_start = time.time()
+            fps_display = 0.0
+
             while True:
                 frame = video_inference.get_frame(camera_id)
                 if frame and frame is not last_frame:
                     last_frame = frame
+
+                    fps_count += 1
+                    elapsed = time.time() - fps_start
+                    if elapsed >= 1.0:
+                        fps_display = fps_count / elapsed
+                        fps_count = 0
+                        fps_start = time.time()
+
+                    jpeg_data = bytearray(frame)
+                    img = cv2.imdecode(np.frombuffer(jpeg_data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    if img is not None:
+                        cv2.putText(img, f"FPS: {fps_display:.1f}", (20, 40),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        _, jpeg = cv2.imencode('.jpg', img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                        if jpeg is not None:
+                            frame = jpeg.tobytes()
+
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
                 else:
@@ -123,8 +147,7 @@ def add_camera():
             'id': new_id,
             'name': name,
             'location': name,
-            'rtsp_url': url if url.startswith('rtsp') else '',
-            'http_url': url if not url.startswith('rtsp') else ''
+            'source': url,
         }
         
         cameras.append(new_camera)
@@ -164,33 +187,6 @@ def get_vlm_status(camera_id):
             'timestamp': last_vlm_time,
             'elapsed': round(elapsed, 1)
         }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# 通过 VideoInference 统一全局管理音频进程，防止双重启动
-@settings_bp.route('/api/audio/control/<camera_id>', methods=['POST'])
-def audio_control(camera_id):
-    """前端音频控制接口：只改变后台静音状态标志位，绝不自己启动进程"""
-    try:
-        from blueprints.video_inference import video_inference
-        data = request.get_json() or {}
-        action = data.get('action')
-        
-        if action == 'status':
-            is_playing = video_inference.is_audio_playing(camera_id)
-            return jsonify({"playing": is_playing}), 200
-
-        elif action == 'stop':
-            video_inference.set_audio_muted(camera_id, True)
-            return jsonify({"status": "stopped"}), 200
-
-        elif action == 'play':
-            video_inference.set_audio_muted(camera_id, False)
-            return jsonify({"status": "play_requested"}), 200
-
-        return jsonify({"error": "无效的 action"}), 400
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -12,6 +12,9 @@ YOLO_IOU_THRESHOLD = config.YOLO_IOU_THRESHOLD
 YOLO_DEVICE = config.YOLO_DEVICE
 YOLO_IMG_SIZE = config.YOLO_IMG_SIZE
 YOLO_QUEUE_SIZE = config.YOLO_QUEUE_SIZE
+MOTION_THRESHOLD = config.MOTION_THRESHOLD
+FULL_SCAN_INTERVAL = config.FULL_SCAN_INTERVAL
+PERSON_TIMEOUT = config.PERSON_TIMEOUT
 VLM_ENABLED = config.VLM_ENABLED
 VLM_BACKEND = config.VLM_BACKEND
 VLM_API_BASE = config.VLM_API_BASE
@@ -25,12 +28,12 @@ import cv2
 import threading
 import numpy as np
 import time
-import subprocess
 import requests
 import base64
 import json
 from collections import defaultdict
 from queue import Queue, Empty, Full
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse, urlunparse, quote
 
 
@@ -49,7 +52,12 @@ def _load_cameras_config():
         print(f"[Config] 加载 cameras.json 失败: {e}")
         return []
 
-def _format_rtsp_url(url, username, password):
+def _format_camera_source(source, username, password):
+    if not source:
+        return source
+    if source.startswith('rtsp://') and username and password:
+        return _format_rtsp_url(source, username, password)
+    return source
     if not username or not password:
         return url
     
@@ -82,14 +90,12 @@ class VideoInference:
         self.model = None
         self.model_path = model_path
         self.captures = {}
-        # 管理全局 ffmpeg 音频进程
-        self.audio_processes = {}
-        # 记录前端通过按键主动停止（静音）的摄像头ID
-        self.muted_cameras = set()
         self.lock = threading.Lock()
-        # 增加一个专门用于启动音频的锁，防止并发瞬间启动两次
-        self.audio_start_lock = threading.Lock()
         self.fps_stats = defaultdict(lambda: {"count": 0, "start_time": time.time(), "display": 0})
+        
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer"
+        
+        self.vlm_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="VLM")
         
         self.running = True
         daemon_thread = threading.Thread(target=self._daemon_sync_loop, daemon=True)
@@ -97,7 +103,7 @@ class VideoInference:
         daemon_thread.start()
         
     def _daemon_sync_loop(self):
-        """全天候同步守护进程：根据 cameras.json 配置自动维持所有摄像头的拉流(视频+音频)和推理"""
+        """全天候同步守护进程：根据 cameras.json 配置自动维持所有摄像头的拉流和推理"""
         while self.running:
             # time.sleep(3.0)
             try:
@@ -107,110 +113,26 @@ class VideoInference:
                     
                 active_ids = set()
                 
-                # 1. 自动为所有配置的摄像头建连并拉流（如果已连接且URL没变，get_or_create会忽略）
                 for cam in active_cameras:
                     cam_id = str(cam.get('id', ''))
                     if not cam_id: continue
                     active_ids.add(cam_id)
                     
-                    # --- 视频拉流自动启动 ---
-                    video_url = cam.get('rtsp_url') or cam.get('http_url')
-                    if video_url:
-                        # 注入凭据
-                        formatted_url = _format_rtsp_url(video_url, cam.get('username'), cam.get('password'))
+                    source = cam.get('source')
+                    if source:
+                        formatted_url = _format_camera_source(source, cam.get('username'), cam.get('password'))
                         self.get_or_create_capture(cam_id, formatted_url)
                         
-                    # --- 音频拉流自动启动 ---
-                    audio_url = cam.get('voice_rtsp_url')
-                    if audio_url and cam_id not in self.muted_cameras:
-                        # 注入凭据
-                        formatted_audio_url = _format_rtsp_url(audio_url, cam.get('username'), cam.get('password'))
-                        self.get_or_create_audio(cam_id, formatted_audio_url)
-                        
-                # 2. 清理已经离线（不在配置中）的设备资源
                 with self.lock:
                     cameras_to_stop = [cid for cid in self.captures.keys() if cid not in active_ids]
-                    # 还需要检查音频进程是否有多余的
-                    audio_to_stop = [cid for cid in self.audio_processes.keys() if cid not in active_ids]
                     
                 for cid in cameras_to_stop:
                     print(f"[VideoInference] 摄像头 {cid} 已从配置中移除，自动停止视频推理资源")
                     self.stop_capture(cid)
                     
-                for cid in audio_to_stop:
-                    print(f"[AudioInference] 摄像头 {cid} 已从配置中移除，自动停止音频资源")
-                    self.stop_audio(cid)
-                    
             except Exception as e:
                 print(f"[VideoInference] Daemon 同步异常: {e}")
 
-    def get_or_create_audio(self, camera_id, stream_url):
-        """确保音频进程存在且在运行。如果在运行，不干预；如果死亡，尝试重启。"""
-        # 使用专用锁防止瞬间并发启动两个进程
-        with self.audio_start_lock:
-            if camera_id in self.audio_processes:
-                proc = self.audio_processes[camera_id]['proc']
-                url = self.audio_processes[camera_id]['url']
-                
-                # 如果进程还活着且 URL 没变，保持运行
-                if proc.poll() is None and url == stream_url:
-                    return
-                # 否则杀掉旧的，准备重建
-                self.stop_audio(camera_id, locked=True)
-                
-            print(f"[PID:{self.pid}] [Audio] 检测到设备上线，启动 ffplay 后台拉流: {camera_id}")
-            cmd = [
-                'ffplay', '-nodisp', '-rtsp_transport', 'tcp', 
-                '-fflags', 'nobuffer', '-flags', 'low_delay', 
-                '-framedrop', '-strict', 'experimental', 
-                '-sync', 'ext', '-af', 'aresample=async=1', 
-                '-probesize', '32', '-analyzeduration', '0',
-                '-i', stream_url
-            ]
-            try:
-                proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                # 必须立即存入字典，防止下一轮循环误判
-                self.audio_processes[camera_id] = {
-                    'proc': proc,
-                    'url': stream_url
-                }
-            except Exception as e:
-                print(f"[Audio] 启动进程失败: {e}")
-
-            
-    def stop_audio(self, camera_id, locked=False):
-        """停止特定摄像头的音频拉流"""
-        def _kill():
-            c_data = self.audio_processes.pop(camera_id, None)
-            if c_data and c_data['proc']:
-                c_data['proc'].kill()
-                c_data['proc'].wait()
-        
-        if locked:
-            _kill()
-        else:
-            with self.lock:
-                _kill()
-                
-    def set_audio_muted(self, camera_id, muted):
-        """响应前端操作，将特定摄像头加入或移出静音集合，并同步停止进程"""
-        with self.lock:
-            if muted:
-                self.muted_cameras.add(camera_id)
-                self.stop_audio(camera_id, locked=True)
-            else:
-                self.muted_cameras.discard(camera_id)
-                # 移出后，下一次 _daemon_sync_loop 会自动将其重启拉流
-                
-    def is_audio_playing(self, camera_id):
-        """查询后台 ffplay 是否正在运行"""
-        with self.audio_start_lock:
-            if camera_id in self.audio_processes:
-                proc = self.audio_processes[camera_id]['proc']
-                return proc.poll() is None
-            return False
-
-    # ------ 以下是原有的模型加载和视频线程方法 ------
     def load_model(self):
         if self.model is None:
             full_path = os.path.join(
@@ -220,7 +142,6 @@ class VideoInference:
             if not os.path.exists(full_path):
                 raise FileNotFoundError(f"找不到模型路径: {full_path}")
             
-            # 模型类型智能识别
             self.model_type = 'pytorch'
             if os.path.isdir(full_path) or 'openvino' in full_path.lower():
                 self.model_type = 'openvino'
@@ -230,11 +151,9 @@ class VideoInference:
             print(f"[VideoInference] 正在初始化 {self.model_type.upper()} 推理引擎: {full_path}")
             
             try:
-                # OpenVINO 和 ONNX 模型加载时建议指定 task='detect'
                 if self.model_type in ['openvino', 'onnx']:
                     self.model = YOLO(full_path, task='detect')
                 else:
-                    # PyTorch 原生模型 (.pt)
                     self.model = YOLO(full_path)
                     if YOLO_DEVICE != 'cpu':
                         self.model.to(YOLO_DEVICE)
@@ -243,7 +162,7 @@ class VideoInference:
             except Exception as e:
                 print(f"[VideoInference] 模型加载失败: {e}")
                 raise e
-    
+
     def get_or_create_capture(self, camera_id, stream_url):
         with self.lock:
             if camera_id not in self.captures:
@@ -255,6 +174,9 @@ class VideoInference:
                     'last_vlm_time': 0,   # 记录上次发送给 VLM 的时间戳
                     'vlm_result': None,   # 记录 VLM 返回的行为分析结果
                     'vlm_frame_counter': 0, # VLM 抽帧计数器
+                    'last_vlm_frame': None, # 缓存上次触发 VLM 的帧，用于时序对比
+                    'last_gray_frame': None, # 缓存上一帧灰度图，用于运动检测
+                    'last_annotated_frame': None, # 缓存上一帧标注结果，用于运动检测跳过时复用
                     'lock': threading.Lock(),
                     'stop_event': threading.Event(),
                     'threads': []
@@ -281,31 +203,32 @@ class VideoInference:
         """第一级：原始流抓取线程 (Producer)"""
         c_data = self.captures[camera_id]
         url = c_data['url']
-        print(f"[Capture] 启动拉流线程: {camera_id}")
+        print(f"[Capture] 启动拉流线程: {camera_id}, 源: {url}")
         
-        # 精简参数：仅保留 tcp 和 nobuffer，去掉重排序等消耗 CPU 的指令
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer"
-        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        is_usb = url.startswith('/dev/video')
         
-        # 核心优化 1：源头降分辨率解码。强制底层解码器输出小图，极大减轻 FFMPEG 的 CPU 压力
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(YOLO_IMG_SIZE))
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(YOLO_IMG_SIZE * 0.75)) # 假设 4:3，或者就让它自适应
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        if is_usb:
+            device_index = int(url.split('/')[-1].replace('video', ''))
+            cap = cv2.VideoCapture(device_index)
+        else:
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(YOLO_IMG_SIZE))
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(YOLO_IMG_SIZE * 0.75))
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         
         while not c_data['stop_event'].is_set():
             ret, frame = cap.read()
             if not ret:
-                # time.sleep(0.01)
-                if not cap.isOpened():
+                if not is_usb and not cap.isOpened():
                     print(f"[Capture] 尝试重连: {url}")
                     cap.release()
                     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
                     cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(YOLO_IMG_SIZE))
                     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(YOLO_IMG_SIZE * 0.75))
                     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                time.sleep(0.1)
                 continue
             
-            # 将新帧丢入队列
             try:
                 while c_data['raw_queue'].full():
                     c_data['raw_queue'].get_nowait()
@@ -323,9 +246,42 @@ class VideoInference:
         
         if self.model is None: self.load_model()
         
+        last_full_scan = time.time()
+        last_person_seen = 0.0
+        
         while not c_data['stop_event'].is_set():
             try:
                 frame = c_data['raw_queue'].get(timeout=1.0)
+                
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                gray = cv2.GaussianBlur(gray, (21, 21), 0)
+                
+                prev_gray = c_data.get('last_gray_frame')
+                c_data['last_gray_frame'] = gray
+                
+                time_since_person = time.time() - last_person_seen
+                in_person_window = time_since_person < float(PERSON_TIMEOUT)
+                
+                should_skip = False
+                if prev_gray is not None and not in_person_window:
+                    diff = cv2.absdiff(prev_gray, gray)
+                    _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
+                    motion_ratio = cv2.countNonZero(thresh) / (frame.shape[0] * frame.shape[1])
+                    
+                    time_since_scan = time.time() - last_full_scan
+                    if motion_ratio < float(MOTION_THRESHOLD) and time_since_scan < float(FULL_SCAN_INTERVAL):
+                        should_skip = True
+                
+                if should_skip:
+                    last_annotated = c_data.get('last_annotated_frame')
+                    if last_annotated is not None:
+                        ret, jpeg = cv2.imencode('.jpg', last_annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                        if ret:
+                            with c_data['lock']:
+                                c_data['latest_jpeg'] = jpeg.tobytes()
+                        continue
+                
+                last_full_scan = time.time()
                 
                 # 核心优化 2：对齐 predict.py 的轻量级调用
                 # 根据模型类型动态调整参数
@@ -342,6 +298,9 @@ class VideoInference:
                     infer_args['device'] = YOLO_DEVICE
                 
                 results = self.model.predict(**infer_args)
+                
+                if len(results[0].boxes) > 0:
+                    last_person_seen = time.time()
                 
                 annotated_frame = results[0].plot()
                 
@@ -362,29 +321,19 @@ class VideoInference:
                             c_data['vlm_frame_counter'] = 0  # 触发后重置计数器
                         
                         # 开启一个独立的守护线程进行请求，绝不阻塞当前的视频流推理
-                        threading.Thread(
-                            target=self._run_vlm_analysis, 
-                            args=(camera_id, frame.copy()), 
-                            daemon=True
-                        ).start()
+                        prev_frame = c_data.get('last_vlm_frame')
+                        c_data['last_vlm_frame'] = frame.copy()
+                        
+                        self.vlm_executor.submit(
+                            self._run_vlm_analysis,
+                            camera_id, prev_frame, frame.copy()
+                        )
                 
-                # 计算 FPS 并叠加
-                stats = self.fps_stats[camera_id]
-                stats["count"] += 1
-                elapsed = time.time() - stats["start_time"]
-                if elapsed >= 1.0:
-                    stats["display"] = stats["count"] / elapsed
-                    stats["count"] = 0
-                    stats["start_time"] = time.time()
-                
-                cv2.putText(annotated_frame, f"PIPELINE FPS: {stats['display']:.1f}", (20, 40), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                
-                # 核心优化 3：降低 JPEG 压缩质量以换取极速编码
-                ret, jpeg = cv2.imencode('.jpg', annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+                ret, jpeg = cv2.imencode('.jpg', annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                 if ret:
                     with c_data['lock']:
                         c_data['latest_jpeg'] = jpeg.tobytes()
+                        c_data['last_annotated_frame'] = annotated_frame
                     
             except Empty:
                 continue
@@ -415,26 +364,32 @@ class VideoInference:
         with self.lock:
             for camera_id in list(self.captures.keys()):
                 self.stop_capture(camera_id)
+        self.vlm_executor.shutdown(wait=False)
 
-    def _run_vlm_analysis(self, camera_id, frame):
+    def _run_vlm_analysis(self, camera_id, prev_frame, curr_frame):
         """专门负责与 Ollama / OpenAI API 交互的后台大模型推理子线程"""
         try:
-            # 1. 缩放图像以节省带宽和推理算力
-            resized = cv2.resize(frame, (640, 480))
-            ret, buffer = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            ret, buffer = cv2.imencode('.jpg', curr_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             if not ret: return
             
-            b64_image = base64.b64encode(buffer).decode('utf-8')
+            b64_curr = base64.b64encode(buffer).decode('utf-8')
+            
+            b64_prev = None
+            if prev_frame is not None:
+                ret2, buffer2 = cv2.imencode('.jpg', prev_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                if ret2:
+                    b64_prev = base64.b64encode(buffer2).decode('utf-8')
             
             payload = {}
             if VLM_BACKEND.lower() == 'ollama':
+                images = [b64_prev, b64_curr] if b64_prev else [b64_curr]
                 payload = {
                     "model": VLM_MODEL_NAME,
                     "messages": [
                         {
                             "role": "user",
                             "content": VLM_PROMPT,
-                            "images": [b64_image]
+                            "images": images
                         }
                     ],
                     "stream": False,
@@ -442,22 +397,20 @@ class VideoInference:
                 }
                 headers = {'Content-Type': 'application/json'}
             elif VLM_BACKEND.lower() == 'openai':
+                content_parts = [{"type": "text", "text": VLM_PROMPT}]
+                if b64_prev:
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{b64_prev}", "detail": "low"}
+                    })
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64_curr}", "detail": "low"}
+                })
                 payload = {
                     "model": VLM_MODEL_NAME,
                     "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": VLM_PROMPT},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/jpeg;base64,{b64_image}",
-                                        "detail": "low"
-                                    }
-                                }
-                            ]
-                        }
+                        {"role": "user", "content": content_parts}
                     ],
                     "response_format": { "type": "json_object" }
                 }
@@ -496,7 +449,7 @@ class VideoInference:
                             with c_data['lock']:
                                 c_data['vlm_result'] = result_dict
                     if result_dict.get('is_violent', False):
-                        self._handle_violent_capture(camera_id, frame, result_dict)
+                        self._handle_violent_capture(camera_id, curr_frame, result_dict)
                         
                 except json.JSONDecodeError:
                     print(f"[VLM] 解析大模型返回的 JSON 失败, 原文: {content}")

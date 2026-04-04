@@ -4,11 +4,9 @@
             "id": "001",
             "name": "摄像头 001",
             "location": "西门围栏",
-            "rtsp_url": "rtsp://192.168.5.7:8554/ch2",
-            "voice_rtsp_url": "rtsp://192.168.5.7:8554/ch2",
-            "username": "160",
-            "password": "601",
-            "http_url": ""
+            "source": "rtsp://fnas:8554/rk3588",
+            "username": "",
+            "password": ""
         }
     ]
 }

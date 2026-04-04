@@ -226,9 +226,6 @@
             <input type="text" id="newStreamName" class="form-control bg-card border-color text-main" placeholder="摄像头名称" style="max-width: 120px;">
             <button class="btn btn-primary" onclick="addNewCamera()">添加源</button>
         </div>
-        <button id="globalAudioToggle" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" onclick="toggleGlobalAudio()" style="background: var(--card-bg); color: var(--text-main); border-color: var(--border-color); transition: all 0.3s ease;">
-            <i class="fas fa-volume-mute me-2" id="audioIcon"></i><span id="audioText">开启现场环境音</span>
-        </button>
     </div>
 </div>
 
@@ -252,8 +249,6 @@
         syncCameras();
         pollInterval = setInterval(syncCameras, 5000);
         setInterval(pollVlmStatus, VLM_POLL_INTERVAL);
-        
-        setTimeout(checkAudioStatus, 1500);
     });
 
     function syncCameras() {
@@ -274,12 +269,6 @@
                     if (!currentIds.has(id)) {
                         card.remove();
                         activeCameras.delete(id);
-                        // 当摄像头离线时，自动停止后台对应的 ffplay 进程
-                        fetch(`/settings/api/audio/control/${id}`, {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({action: 'stop'})
-                        }).catch(() => {});
                     }
                 }
 
@@ -295,21 +284,12 @@
                     cameras.forEach(camera => {
                         if (!activeCameras.has(camera.id)) {
                             // 发现新上线的设备
-                            const card = createCameraCard(camera.id, camera.name, camera.webrtc_url);
+                            const card = createCameraCard(camera.id, camera.name, camera.source);
                             monitorGrid.appendChild(card);
                             activeCameras.set(camera.id, card);
-                            
-                            // 尝试为新设备同步开启声音
-                            if (isGlobalAudioEnabled) {
-                                fetch(`/settings/api/audio/control/${camera.id}`, {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({action: 'play'})
-                                }).catch(() => {});
-                            }
                         } else {
                             // 如果信息有变化则更新
-                            updateCameraCard(camera.id, camera.name, camera.webrtc_url);
+                            updateCameraCard(camera.id, camera.name, camera.source);
                         }
                     });
                 }
@@ -329,12 +309,6 @@
                 <span class="camera-name"><i class="fas fa-map-marker-alt me-2"></i>${name}</span>
                 <span class="status-badge status-normal">
                     <span class="status-dot"></span>activate
-                </span>
-            </div>
-            <div class="camera-info-bar" id="info-bar-${id}">
-                <span class="resolution">
-                    <i class="fas fa-desktop"></i>
-                    <span class="resolution-text">等待数据...</span>
                 </span>
             </div>
             <div class="monitor-body">
@@ -422,67 +396,8 @@
         });
     }
 
-    // --- 音频流管理逻辑 (服务器端直出方案) ---
-    let isGlobalAudioEnabled = false;
-
-    // 定期检查服务器后台音频播放状态，保持 UI 同步
-    function checkAudioStatus() {
-        if (activeCameras.size === 0) return;
-        
-        // 假设只对第一个激活的摄像头做状态同步（如果是多路可进一步扩展）
-        const firstCameraId = activeCameras.keys().next().value;
-        
-        fetch(`/settings/api/audio/control/${firstCameraId}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({action: 'status'})
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.playing !== isGlobalAudioEnabled) {
-                isGlobalAudioEnabled = data.playing;
-                updateAudioBtnUI();
-            }
-        })
-        .catch(() => {});
-    }
-
-    function toggleGlobalAudio() {
-        isGlobalAudioEnabled = !isGlobalAudioEnabled;
-        updateAudioBtnUI();
-        
-        const action = isGlobalAudioEnabled ? 'play' : 'stop';
-        
-        activeCameras.forEach((_, id) => {
-            fetch(`/settings/api/audio/control/${id}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: action})
-            }).catch(e => console.error('音频控制失败:', e));
-        });
-    }
-
-    function updateAudioBtnUI() {
-        const icon = document.getElementById('audioIcon');
-        const text = document.getElementById('audioText');
-        const btn = document.getElementById('globalAudioToggle');
-
-        if (isGlobalAudioEnabled) {
-            icon.className = 'fas fa-volume-up text-success';
-            text.innerText = '正在监听环境音';
-            btn.style.borderColor = 'var(--success)';
-            btn.style.color = 'var(--success)';
-        } else {
-            icon.className = 'fas fa-volume-mute';
-            text.innerText = '开启现场环境音';
-            btn.style.borderColor = 'var(--border-color)';
-            btn.style.color = 'var(--text-main)';
-        }
-    }
-
     window.onbeforeunload = function() {
         if (pollInterval) clearInterval(pollInterval);
-        // 注意：不在这里调用 stop，保证服务器后台一直播放，直到手动关闭
     };
 </script>
 {% endblock %}

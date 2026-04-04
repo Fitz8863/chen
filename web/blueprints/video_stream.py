@@ -29,7 +29,7 @@ def list_cameras():
         result.append({
             'id': cam.get('id'),
             'name': cam.get('name', f"摄像头 {cam.get('id', '')}"),
-            'webrtc_url': cam.get('http_url') or cam.get('rtsp_url'),
+            'source': cam.get('source'),
             'location': cam.get('location', '未知位置'),
         })
     return jsonify({'cameras': result}), 200
