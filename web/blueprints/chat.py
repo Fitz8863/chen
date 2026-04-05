@@ -19,7 +19,7 @@ def get_family_room():
         room = ChatRoom(name='家庭群', type='group', is_pinned=True)
         db.session.add(room)
         db.session.flush()
-        for user in User.query.filter(User.role.in_(['family', 'admin', 'assistant'])).all():
+        for user in User.query.filter(User.role.in_(['family', 'admin'])).all():
             member = ChatRoomMember(room_id=room.id, user_id=user.id)
             db.session.add(member)
         db.session.commit()
@@ -172,7 +172,7 @@ def create_private():
 @chat_bp.route('/api/users')
 @login_required
 def api_users():
-    users = User.query.filter(User.role.in_(['family', 'admin', 'assistant'])).all()
+    users = User.query.filter(User.role.in_(['family', 'admin'])).all()
     return jsonify({
         'users': [{
             'id': u.id,

@@ -87,7 +87,7 @@ flake8 . --max-line-length=120
 - **UI**: Use `flash(message, category)`.
 
 ### 3.6 Role-Based Access Control (RBAC)
-- Roles: `admin`, `assistant`, `user`.
+- Roles: `admin`, `family`, `user`.
 - Use `@admin_required` or `@super_admin_required` from `blueprints.auth`.
 
 ## 4. Agentic Development Workflow

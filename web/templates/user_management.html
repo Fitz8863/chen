@@ -109,8 +109,6 @@
                                     <td>
                                         {% if user.role == 'admin' %}
                                             <span class="badge bg-danger">超级管理员</span>
-                                        {% elif user.role == 'assistant' %}
-                                            <span class="badge bg-warning">辅助管理员</span>
                                         {% elif user.role == 'family' %}
                                             <span class="badge bg-info">家人</span>
                                         {% else %}
@@ -160,7 +158,6 @@
                     <select id="add_role" class="form-select">
                         <option value="user">游客</option>
                         <option value="family">家人</option>
-                        <option value="assistant">辅助管理员</option>
                     </select>
                 </div>
             </div>
@@ -195,7 +192,6 @@
                     <select id="edit_role" class="form-select">
                         <option value="user">游客</option>
                         <option value="family">家人</option>
-                        <option value="assistant">辅助管理员</option>
                     </select>
                 </div>
             </div>

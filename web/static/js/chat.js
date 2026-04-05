@@ -122,10 +122,13 @@ function loadGroupMembers(roomId) {
             count.textContent = `(${data.members.length})`;
             let html = '';
             data.members.forEach((m, index) => {
-                const avatar = m.avatar ? `/static/${m.avatar}` : '/static/img/default-avatar.png';
+                const initial = (m.nickname || '?').substring(0, 2);
+                const avatarHtml = m.avatar
+                    ? `<img src="/static/${m.avatar}" class="member-avatar" title="${m.nickname}">`
+                    : `<div class="member-avatar-placeholder" title="${m.nickname}">${initial}</div>`;
                 html += `
                     <div class="member-item">
-                        <img src="${avatar}" class="member-avatar" title="${m.nickname}">
+                        ${avatarHtml}
                         <div class="member-nickname">${m.nickname}</div>
                     </div>`;
             });
@@ -392,7 +395,7 @@ function renderUserList(users) {
         const avatarHtml = u.avatar
             ? `<img src="/static/${u.avatar}" style="width:36px;height:36px;border-radius:4px;margin-right:12px;object-fit:cover;flex-shrink:0;">`
             : `<div class="room-avatar-placeholder" style="width:36px;height:36px;font-size:0.8rem;margin-right:12px;">${(u.nickname || '?')[0].toUpperCase()}</div>`;
-        const roleText = u.role === 'admin' ? '管理员' : u.role === 'assistant' ? '辅助管理员' : '家人';
+        const roleText = u.role === 'admin' ? '超级管理员' : '家人';
         html += `
         <div class="user-list-item" onclick="startPrivateChat(${u.id})">
             ${avatarHtml}

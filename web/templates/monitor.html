@@ -121,6 +121,92 @@
     .empty-state p {
         color: var(--text-muted);
     }
+    .add-camera-bar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+    .add-camera-form {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--card-bg);
+        padding: 10px 20px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-sm);
+    }
+    .add-camera-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0 12px;
+        transition: border-color 0.2s ease;
+    }
+    .add-camera-field:focus-within {
+        border-color: var(--primary-color);
+    }
+    .add-camera-icon {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+    .add-camera-input {
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text-main);
+        font-size: 0.9rem;
+        padding: 8px 0;
+        min-width: 280px;
+    }
+    .add-camera-name-input {
+        min-width: 120px;
+    }
+    .add-camera-location-input {
+        min-width: 140px;
+    }
+    .add-camera-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, #c2410c 0%, #9a3412 100%);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .add-camera-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(194, 65, 12, 0.3);
+    }
+    .add-camera-btn:active {
+        transform: translateY(0);
+    }
+    .add-camera-btn i {
+        font-size: 0.8rem;
+    }
+    @media (max-width: 768px) {
+        .add-camera-form {
+            flex-direction: column;
+            width: 100%;
+            padding: 12px;
+        }
+        .add-camera-input {
+            min-width: 100%;
+        }
+        .add-camera-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
     .status-badge {
         padding: 5px 12px;
         border-radius: 20px;
@@ -218,15 +304,25 @@
     请 <a href="{{ url_for('auth.login') }}">登录</a> 后查看实时监控画面
 </div>
 {% else %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div class="d-flex gap-3 align-items-center flex-grow-1 me-4">
-        <div class="input-group input-group-sm" style="max-width: 400px;">
-            <span class="input-group-text bg-card border-color"><i class="fas fa-link text-muted"></i></span>
-            <input type="text" id="newStreamUrl" class="form-control bg-card border-color text-main" placeholder="输入 RTSP/HTTP 视频流地址">
-            <input type="text" id="newStreamName" class="form-control bg-card border-color text-main" placeholder="摄像头名称" style="max-width: 120px;">
-            <button class="btn btn-primary" onclick="addNewCamera()">添加源</button>
+<div class="add-camera-bar">
+    <form class="add-camera-form" onsubmit="handleAddCamera(event)">
+        <div class="add-camera-field">
+            <i class="fas fa-link add-camera-icon"></i>
+            <input type="text" id="newStreamUrl" class="add-camera-input" placeholder="输入 RTSP/HTTP 视频流地址">
         </div>
-    </div>
+        <div class="add-camera-field add-camera-name-field">
+            <i class="fas fa-tag add-camera-icon"></i>
+            <input type="text" id="newStreamName" class="add-camera-input add-camera-name-input" placeholder="摄像头名称">
+        </div>
+        <div class="add-camera-field add-camera-location-field">
+            <i class="fas fa-map-marker-alt add-camera-icon"></i>
+            <input type="text" id="newStreamLocation" class="add-camera-input add-camera-location-input" placeholder="安装地点（可选）">
+        </div>
+        <button type="submit" class="add-camera-btn">
+            <i class="fas fa-plus"></i>
+            <span>添加</span>
+        </button>
+    </form>
 </div>
 
 <div class="monitor-grid" id="monitorGrid">
@@ -243,13 +339,42 @@
     let activeCameras = new Map();
     let pollInterval = null;
     
-    document.addEventListener('DOMContentLoaded', function() {
-        if (!document.getElementById('monitorGrid')) return;
+    function handleAddCamera(event) {
+        event.preventDefault();
+        addNewCamera();
+    }
+    
+    function addNewCamera() {
+        const url = document.getElementById('newStreamUrl').value.trim();
+        const name = document.getElementById('newStreamName').value.trim() || '未命名摄像头';
+        const location = document.getElementById('newStreamLocation').value.trim() || null;
         
-        syncCameras();
-        pollInterval = setInterval(syncCameras, 5000);
-        setInterval(pollVlmStatus, VLM_POLL_INTERVAL);
-    });
+        if (!url) {
+            alert('请输入视频流地址');
+            return;
+        }
+        
+        fetch('/settings/api/cameras/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, url: url, location: location })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.message) {
+                document.getElementById('newStreamUrl').value = '';
+                document.getElementById('newStreamName').value = '';
+                document.getElementById('newStreamLocation').value = '';
+                syncCameras();
+            } else {
+                alert(data.error || '添加失败');
+            }
+        })
+        .catch(err => {
+            console.error('添加摄像头失败:', err);
+            alert('添加失败，请重试');
+        });
+    }
 
     function syncCameras() {
         fetch('/api/cameras')
@@ -261,10 +386,8 @@
                 const emptyStateDesc = document.getElementById('emptyStateDesc');
                 const monitorGrid = document.getElementById('monitorGrid');
                 
-                // 追踪当前响应中的 ID
                 const currentIds = new Set(cameras.map(c => c.id));
 
-                // 1. 移除已掉线的摄像头
                 for (let [id, card] of activeCameras) {
                     if (!currentIds.has(id)) {
                         card.remove();
@@ -272,7 +395,6 @@
                     }
                 }
 
-                // 2. 添加或更新摄像头
                 if (cameras.length === 0) {
                     emptyState.style.display = 'block';
                     emptyState.querySelector('i').className = 'fas fa-video-slash';
@@ -283,12 +405,10 @@
                     
                     cameras.forEach(camera => {
                         if (!activeCameras.has(camera.id)) {
-                            // 发现新上线的设备
                             const card = createCameraCard(camera.id, camera.name, camera.source);
                             monitorGrid.appendChild(card);
                             activeCameras.set(camera.id, card);
                         } else {
-                            // 如果信息有变化则更新
                             updateCameraCard(camera.id, camera.name, camera.source);
                         }
                     });
@@ -298,6 +418,14 @@
                 console.error('获取摄像头列表失败:', error);
             });
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!document.getElementById('monitorGrid')) return;
+        
+        syncCameras();
+        pollInterval = setInterval(syncCameras, 5000);
+        setInterval(pollVlmStatus, VLM_POLL_INTERVAL);
+    });
 
     function createCameraCard(id, name, webrtcUrl) {
         const card = document.createElement('div');

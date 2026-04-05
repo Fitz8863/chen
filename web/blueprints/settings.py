@@ -128,6 +128,7 @@ def add_camera():
         data = request.json
         name = data.get('name')
         url = data.get('url')
+        location = data.get('location') or 'NULL'
         
         if not name or not url:
             return jsonify({'error': '名称和地址不能为空'}), 400
@@ -146,7 +147,7 @@ def add_camera():
         new_camera = {
             'id': new_id,
             'name': name,
-            'location': name,
+            'location': location,
             'source': url,
         }
         

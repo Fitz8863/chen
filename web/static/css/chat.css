@@ -36,6 +36,19 @@
     object-fit: cover;
 }
 
+.member-avatar-placeholder {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    background: #f0883e;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
 .member-item {
     display: flex;
     flex-direction: column;

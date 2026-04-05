@@ -38,8 +38,8 @@
             <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden greeting-card">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-blue-100 p-3 me-3">
-                            <i class="fas fa-shield-halved text-primary fs-4"></i>
+                        <div class="icon-circle icon-shield me-3">
+                            <i class="fas fa-shield-halved fs-4"></i>
                         </div>
                         <h5 class="mb-0 fw-bold">智能守护</h5>
                     </div>
@@ -56,8 +56,8 @@
             <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden greeting-card">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-green-100 p-3 me-3">
-                            <i class="fas fa-leaf text-success fs-4"></i>
+                        <div class="icon-circle icon-leaf me-3">
+                            <i class="fas fa-leaf fs-4"></i>
                         </div>
                         <h5 class="mb-0 fw-bold">温馨家园</h5>
                     </div>
@@ -74,8 +74,8 @@
             <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden greeting-card">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-orange-100 p-3 me-3">
-                            <i class="fas fa-heart text-warning fs-4"></i>
+                        <div class="icon-circle icon-heart me-3">
+                            <i class="fas fa-heart fs-4"></i>
                         </div>
                         <h5 class="mb-0 fw-bold">家人安康</h5>
                     </div>
@@ -92,27 +92,14 @@
 
     <div class="row">
         <div class="col-md-12">
-            <div class="card border-0 shadow-sm rounded-4 p-4" style="background: var(--card-bg);">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center">
-                        <div class="me-5">
-                            <div class="text-muted x-small mb-1">已连接摄像头</div>
-                            <div class="h4 fw-bold mb-0" id="cameraCount">0</div>
-                        </div>
-                        <div class="me-5">
-                            <div class="text-muted x-small mb-1">今日累计告警</div>
-                            <div class="h4 fw-bold mb-0" id="todayCount">0</div>
-                        </div>
-                        <div>
-                            <div class="text-muted x-small mb-1">系统稳定性</div>
-                            <div class="h4 fw-bold mb-0 text-success">99.9%</div>
-                        </div>
-                    </div>
-                    <div>
-                        <a href="{{ url_for('main.monitor') }}" class="btn btn-primary btn-lg rounded-pill px-4">
-                            <i class="fas fa-desktop me-2"></i>进入监控中心
-                        </a>
-                    </div>
+            <div class="card border-0 shadow-sm rounded-4 p-5 text-center" style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%);">
+                <div class="card-body py-5">
+                    <i class="fas fa-shield-halved fa-3x mb-4 text-white opacity-75"></i>
+                    <h3 class="fw-bold text-white mb-3">全天候智能守护，让安心如影随形</h3>
+                    <p class="text-white opacity-75 mb-4 fs-5">AI 实时监测 · 异常行为识别 · 即时告警推送</p>
+                    <a href="{{ url_for('main.monitor') }}" class="btn btn-light btn-lg rounded-pill px-5 fw-bold text-primary">
+                        <i class="fas fa-desktop me-2"></i>进入监控中心
+                    </a>
                 </div>
             </div>
         </div>
@@ -131,6 +118,26 @@
     .bg-blue-100 { background-color: #ebf5ff; }
     .bg-green-100 { background-color: #f0fdf4; }
     .bg-orange-100 { background-color: #fffaf0; }
+
+    .icon-circle {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(37, 99, 235, 0.12);
+        color: var(--primary-color, #2563eb);
+        transition: background 0.3s ease;
+    }
+    .icon-circle.icon-leaf {
+        background: rgba(21, 128, 61, 0.12);
+        color: var(--color-success, #15803d);
+    }
+    .icon-circle.icon-heart {
+        background: rgba(217, 119, 6, 0.12);
+        color: var(--color-warning, #d97706);
+    }
 
     .greeting-card {
         transition: all 0.3s ease;

@@ -17,6 +17,37 @@ socketio.init_app(app)
 from blueprints import init_db
 init_db(app)
 
+def ensure_family_assistant():
+    from blueprints.models import User, ChatRoom, ChatRoomMember
+    from blueprints import db
+    from flask_bcrypt import Bcrypt
+    with app.app_context():
+        assistant = User.query.filter_by(username='family_assistant').first()
+        if not assistant:
+            bcrypt = Bcrypt(app)
+            hashed = bcrypt.generate_password_hash('assistant_auto_2026').decode('utf-8')
+            assistant = User(
+                username='family_assistant',
+                password=hashed,
+                role='family',
+                nickname='家庭助手',
+                avatar=''
+            )
+            db.session.add(assistant)
+            db.session.commit()
+            print("[System] 家庭助手用户已自动创建")
+        room = ChatRoom.query.filter_by(type='group', is_pinned=True).first()
+        if room:
+            member = ChatRoomMember.query.filter_by(room_id=room.id, user_id=assistant.id).first()
+            if not member:
+                db.session.add(ChatRoomMember(room_id=room.id, user_id=assistant.id))
+                db.session.commit()
+                print("[System] 家庭助手已加入家庭群")
+        else:
+            print("[System] 家庭群尚未创建，将在首次访问聊天页时自动加入")
+
+ensure_family_assistant()
+
 
 from blueprints.main import main_bp
 from blueprints.auth import auth_bp

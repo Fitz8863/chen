@@ -104,8 +104,9 @@ class VideoInference:
         
     def _daemon_sync_loop(self):
         """全天候同步守护进程：根据 cameras.json 配置自动维持所有摄像头的拉流和推理"""
+        import time
         while self.running:
-            # time.sleep(3.0)
+            time.sleep(5.0)
             try:
                 active_cameras = _load_cameras_config()
                 if not active_cameras:
@@ -514,6 +515,8 @@ class VideoInference:
                         db.session.add(capture)
                         db.session.commit()
                         print(f"[VLM 抓拍] 图片已保存: {filename}, 违规类型: {behavior_type}, 威胁等级: {threat_level}")
+                        
+                        self._notify_family_chat(capture, filename, description, behavior_type)
             except Exception as e:
                 print(f"[VLM 抓拍] 数据库写入失败: {e}")
                 try:
@@ -540,6 +543,69 @@ class VideoInference:
                 
         except Exception as e:
             print(f"[VLM 抓拍] 自动抓拍处理异常: {e}")
+
+    def _notify_family_chat(self, capture, filename, description, behavior_type):
+        try:
+            from blueprints.models import User, ChatRoom, ChatMessage
+            from blueprints import db
+            from blueprints.chat import get_family_room
+            from exts import socketio
+            from datetime import datetime
+            
+            if not self.app:
+                return
+            
+            with self.app.app_context():
+                assistant = User.query.filter_by(username='family_assistant').first()
+                if not assistant:
+                    print("[家庭助手] 用户不存在，跳过群消息推送")
+                    return
+                
+                room = get_family_room()
+                if not room:
+                    print("[家庭助手] 家庭群不存在，跳过群消息推送")
+                    return
+                
+                image_url = f"/static/captures/{filename}"
+                content = f"⚠️ 异常行为告警\n\n"
+                content += f"行为类型：{behavior_type}\n"
+                content += f"威胁等级：{capture.threat_level}\n"
+                content += f"涉及人数：{capture.num_people_involved}\n"
+                content += f"摄像头：{capture.camera_id} @ {capture.location}\n"
+                content += f"分析详情：{description}\n"
+                if capture.evidence:
+                    content += f"证据：{capture.evidence}"
+                
+                msg = ChatMessage(
+                    room_id=room.id,
+                    sender_id=assistant.id,
+                    content=content,
+                    message_type='image',
+                    image_url=image_url
+                )
+                db.session.add(msg)
+                db.session.commit()
+                
+                payload = {
+                    'id': msg.id,
+                    'room_id': room.id,
+                    'sender_id': assistant.id,
+                    'sender_name': '家庭助手',
+                    'sender_avatar': assistant.avatar,
+                    'content': content,
+                    'message_type': 'image',
+                    'image_url': image_url,
+                    'time': msg.created_at.strftime('%H:%M'),
+                    'created_at': msg.created_at.isoformat(),
+                    'is_recalled': False,
+                    'reply_to_id': None,
+                    'reply_content': None,
+                    'reply_sender_name': None
+                }
+                socketio.emit('new_message', payload, room=str(room.id))
+                print(f"[家庭助手] 已推送告警消息到家庭群: {behavior_type}")
+        except Exception as e:
+            print(f"[家庭助手] 推送群消息失败: {e}")
 
 
 video_inference = VideoInference()

@@ -1,12 +1,10 @@
 {
     "cameras": [
         {
-            "id": "001",
-            "name": "摄像头 001",
-            "location": "西门围栏",
-            "source": "rtsp://fnas:8554/rk3588",
-            "username": "",
-            "password": ""
+            "id": "28ab6de3",
+            "name": "www",
+            "location": "NULL",
+            "source": "rtsp://fnas:8554/rk3588"
         }
     ]
 }

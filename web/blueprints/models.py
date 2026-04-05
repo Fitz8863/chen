@@ -15,12 +15,8 @@ class User(db.Model, UserMixin):
         return self.role == 'admin'
 
     @property
-    def is_assistant(self):
-        return self.role == 'assistant'
-    
-    @property
     def is_admin(self):
-        return self.role in ['admin', 'assistant', 'family']
+        return self.role in ['admin', 'family']
 
 class Capture(db.Model):
     id = db.Column(db.Integer, primary_key=True)
