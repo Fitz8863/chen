@@ -4,7 +4,9 @@
             "id": "28ab6de3",
             "name": "www",
             "location": "NULL",
-            "source": "rtsp://fnas:8554/rk3588" 
+            "source": "rtsp://192.168.5.2:8554/ch1",
+            "username": "160",
+            "password": "601"
         }
     ]
 }

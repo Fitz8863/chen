@@ -58,14 +58,18 @@ def _format_camera_source(source, username, password):
     if source.startswith('rtsp://') and username and password:
         return _format_rtsp_url(source, username, password)
     return source
+
+
+def _format_rtsp_url(url, username, password):
+    from urllib.parse import urlparse, urlunparse, quote
+    
     if not username or not password:
         return url
     
     parsed = urlparse(url)
     if parsed.username or parsed.password:
-        return url 
+        return url
         
-    # 安全编码用户名和密码
     safe_user = quote(str(username), safe='')
     safe_pass = quote(str(password), safe='')
     
