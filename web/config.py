@@ -18,7 +18,8 @@ MAIL_USERNAME='3189801930@qq.com'
 MAIL_PASSWORD='efcupjqhgltfddaj'
 MAIL_DEFAULT_SENDER='3189801930@qq.com'
 
-
+# AI 聊天
+AI_URL = 'http://fnas:3004/'
 
 # YOLO 推理配置
 YOLO_MODEL_PATH = 'model/yolo26n_openvino_model'
@@ -32,7 +33,7 @@ FULL_SCAN_INTERVAL = 1.0   # 强制心跳扫描间隔（秒）：即使画面静
 PERSON_TIMEOUT = 3.0       # 人在持续检测窗口（秒）：检测到有人后，此时间内始终执行YOLO不跳帧，确保捕捉摔倒等静态危险
 
 # 多模态大模型 (VLM) 暴力行为分析配置
-VLM_ENABLED = False  # 默认为 False，你可以手动改为 True 开启大模型联动分析
+VLM_ENABLED = True  # 默认为 False，你可以手动改为 True 开启大模型联动分析
 VLM_BACKEND = 'openai'  # 可选: 'ollama' 或 'openai' (后者兼容几乎所有商用云端 API)
 VLM_API_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'  # api地址
 VLM_API_KEY = 'sk-41fd6c7956c1414ba4c1662cb07ad846'  # OpenAI 等云端大模型需要的 API Key，Ollama 本地部署可留空

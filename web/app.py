@@ -11,6 +11,11 @@ static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 
 app.config.from_object(config)
 
+@app.context_processor
+def inject_config():
+    from flask import Flask
+    return dict(AI_URL=config.AI_URL)
+
 bcrypt = Bcrypt(app)
 socketio.init_app(app)
 

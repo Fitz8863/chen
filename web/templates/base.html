@@ -317,6 +317,11 @@
                         <i class="fas fa-comments me-2"></i><span>家庭聊天</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ AI_URL }}" target="_blank" onclick="closeSidebarOnNavigate()">
+                        <i class="fas fa-robot me-2"></i><span>AI聊天</span>
+                    </a>
+                </li>
                 {% endif %}
                 {% if current_user.is_authenticated and current_user.is_super_admin %}
                 <li class="nav-item">

@@ -54,7 +54,6 @@ def index():
     """系统设置页面"""
     return render_template('settings.html')
 
-
 @settings_bp.route('/api/video/stream/<camera_id>')
 def video_stream(camera_id):
     """YOLO推理视频流接口"""
