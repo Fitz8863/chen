@@ -60,9 +60,9 @@ def video_stream(camera_id):
     print(f"[VideoStream] 收到摄像头 {camera_id} 的请求")
     try:
         from blueprints.video_inference import video_inference, _format_camera_source
-        from blueprints.video_stream import load_cameras_config
+        from blueprints.video_stream import get_cameras
 
-        cameras = load_cameras_config()
+        cameras = get_cameras()
         stream_url = None
         for cam in cameras:
             if str(cam.get('id', '')) == str(camera_id):
@@ -121,45 +121,6 @@ def video_stream(camera_id):
         return str(e), 500
 
 
-@settings_bp.route('/api/cameras/add', methods=['POST'])
-def add_camera():
-    try:
-        data = request.json
-        name = data.get('name')
-        url = data.get('url')
-        location = data.get('location') or 'NULL'
-        
-        if not name or not url:
-            return jsonify({'error': '名称和地址不能为空'}), 400
-            
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cameras.json')
-        
-        cameras = []
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                cameras = config.get('cameras', [])
-        
-        import uuid
-        new_id = str(uuid.uuid4().hex[:8])
-        
-        new_camera = {
-            'id': new_id,
-            'name': name,
-            'location': location,
-            'source': url,
-        }
-        
-        cameras.append(new_camera)
-        
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump({'cameras': cameras}, f, ensure_ascii=False, indent=4)
-            
-        return jsonify({'message': '摄像头添加成功', 'id': new_id}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @settings_bp.route('/api/vlm/status/<camera_id>', methods=['GET'])
 def get_vlm_status(camera_id):
     """获取特定摄像头的最新 VLM 分析结果"""
@@ -188,6 +149,49 @@ def get_vlm_status(camera_id):
             'elapsed': round(elapsed, 1)
         }), 200
         
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@settings_bp.route('/api/mqtt/status', methods=['GET'])
+def get_mqtt_status():
+    """获取 MQTT 连接状态"""
+    try:
+        from blueprints.mqtt_manager import get_mqtt_status as mqtt_get_status
+        status = mqtt_get_status()
+        return jsonify(status), 200
+    except Exception as e:
+        return jsonify({'connected': False, 'subscribed': False, 'info': None, 'error': str(e)}), 200
+
+
+@settings_bp.route('/api/mqtt/connect', methods=['POST'])
+def mqtt_connect():
+    """连接 MQTT 服务器"""
+    try:
+        data = request.json
+        broker = data.get('broker', 'localhost')
+        port = int(data.get('port', 1883))
+        username = data.get('username', '')
+        password = data.get('password', '')
+        
+        from blueprints.mqtt_manager import connect_mqtt
+        success, message = connect_mqtt(broker, port, username, password)
+        
+        if success:
+            return jsonify({'message': message}), 200
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@settings_bp.route('/api/mqtt/disconnect', methods=['POST'])
+def mqtt_disconnect():
+    """断开 MQTT 连接"""
+    try:
+        from blueprints.mqtt_manager import disconnect_mqtt
+        disconnect_mqtt()
+        return jsonify({'message': '已断开 MQTT 连接'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

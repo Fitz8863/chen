@@ -1,4 +1,3 @@
-import os
 import json
 from flask import Blueprint, jsonify
 
@@ -7,23 +6,19 @@ from .auth import admin_required
 
 video_stream_bp = Blueprint('video_stream', __name__, url_prefix='/api')
 
-CAMERAS_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cameras.json')
 
-
-def load_cameras_config():
-    if not os.path.exists(CAMERAS_CONFIG_PATH):
-        return []
+def get_cameras():
+    """从 MQTT 获取摄像头列表"""
     try:
-        with open(CAMERAS_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        return config.get('cameras', [])
+        from blueprints.mqtt_manager import get_cameras_from_mqtt
+        return get_cameras_from_mqtt()
     except Exception:
         return []
 
 
 @video_stream_bp.route('/cameras')
 def list_cameras():
-    cameras = load_cameras_config()
+    cameras = get_cameras()
     result = []
     for cam in cameras:
         result.append({

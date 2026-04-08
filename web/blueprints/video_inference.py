@@ -39,25 +39,17 @@ from urllib.parse import urlparse, urlunparse, quote
 
 
 def _load_cameras_config():
-    """从 cameras.json 加载摄像头配置"""
-    config_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'cameras.json'
-    )
+    """从 MQTT 获取摄像头配置，若 MQTT 未连接则返回空列表"""
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data.get('cameras', [])
+        from blueprints.mqtt_manager import get_cameras_from_mqtt
+        cameras = get_cameras_from_mqtt()
+        if cameras:
+            return cameras
     except Exception as e:
-        print(f"[Config] 加载 cameras.json 失败: {e}")
-        return []
+        print(f"[Config] 从 MQTT 获取摄像头失败: {e}")
+    return []
 
-def _format_camera_source(source, username, password):
-    if not source:
-        return source
-    if source.startswith('rtsp://') and username and password:
-        return _format_rtsp_url(source, username, password)
-    return source
+def _format_rtsp_url(url, username, password):
     if not username or not password:
         return url
     
@@ -65,12 +57,19 @@ def _format_camera_source(source, username, password):
     if parsed.username or parsed.password:
         return url 
         
-    # 安全编码用户名和密码
     safe_user = quote(str(username), safe='')
     safe_pass = quote(str(password), safe='')
     
     netloc = f"{safe_user}:{safe_pass}@{parsed.netloc}"
     return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+
+
+def _format_camera_source(source, username, password):
+    if not source:
+        return source
+    if source.startswith('rtsp://') and username and password:
+        return _format_rtsp_url(source, username, password)
+    return source
 
 third_party_path = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

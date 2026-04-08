@@ -21,6 +21,12 @@ MAIL_DEFAULT_SENDER='3189801930@qq.com'
 # AI 聊天
 AI_URL = 'http://fnas:3004/'
 
+# MQTT 配置
+MQTT_BROKER = 'localhost'
+MQTT_PORT = 1883
+MQTT_USERNAME = ''
+MQTT_PASSWORD = ''
+
 # YOLO 推理配置
 YOLO_MODEL_PATH = 'model/yolo26n_openvino_model'
 YOLO_CONF_THRESHOLD = 0.25

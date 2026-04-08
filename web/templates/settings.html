@@ -99,6 +99,59 @@
             </div>
         </div>
     </div>
+
+    <!-- MQTT 连接设置 -->
+    <div class="col-12 mb-4">
+        <div class="d-flex align-items-center mb-3">
+            <i class="fas fa-wifi me-2" style="color: var(--primary);"></i>
+            <h5 class="mb-0 fw-bold">MQTT 连接设置</h5>
+        </div>
+        
+        <div class="card border-0 rounded-4" style="background: var(--bg-card); box-shadow: var(--shadow-md);">
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">服务器地址</label>
+                        <input type="text" class="form-control" id="mqttBroker" placeholder="例如: localhost 或 192.168.1.100">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">端口</label>
+                        <input type="number" class="form-control" id="mqttPort" value="1883">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-flex align-items-center h-100">
+                            <span id="mqttStatusBadge" class="badge bg-secondary">未连接</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">用户名（可选）</label>
+                        <input type="text" class="form-control" id="mqttUsername" placeholder="留空则匿名登录">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">密码（可选）</label>
+                        <input type="password" class="form-control" id="mqttPassword" placeholder="留空则匿名登录">
+                    </div>
+                    <div class="col-12">
+                        <button type="button" class="btn btn-primary" id="btnMqttConnect" onclick="connectMqtt()">
+                            <i class="fas fa-plug me-1"></i>连接
+                        </button>
+                        <button type="button" class="btn btn-outline-danger ms-2" id="btnMqttDisconnect" onclick="disconnectMqtt()" style="display: none;">
+                            <i class="fas fa-unlink me-1"></i>断开
+                        </button>
+                    </div>
+                </div>
+
+                <div id="mqttInfoSection" class="mt-4" style="display: none;">
+                    <hr>
+                    <h6 class="fw-bold mb-3"><i class="fas fa-chart-line me-2"></i>设备状态</h6>
+                    <div id="mqttInfoContent" class="p-3 rounded" style="background: var(--bg-main);">
+                        <pre id="mqttInfoText" class="mb-0 text-success" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     {% endif %}
 </div>
 
@@ -108,6 +161,7 @@
 <script>
 (function() {
     let settingsLoaded = false;
+    let mqttPollInterval = null;
     
     document.addEventListener('DOMContentLoaded', function() {
         if (settingsLoaded) return;
@@ -115,6 +169,7 @@
         
         {% if current_user.is_super_admin %}
         loadSystemConfig();
+        loadMqttStatus();
         {% endif %}
         initThemeButtons();
         
@@ -195,6 +250,99 @@
             }
         })
         .catch(err => console.error('Error saving config:', err));
+    }
+
+    function loadMqttStatus() {
+        fetch('/settings/api/mqtt/status')
+            .then(res => res.json())
+            .then(data => {
+                updateMqttUI(data);
+            })
+            .catch(err => console.error('Error loading MQTT status:', err));
+    }
+
+    function updateMqttUI(data) {
+        const badge = document.getElementById('mqttStatusBadge');
+        const connectBtn = document.getElementById('btnMqttConnect');
+        const disconnectBtn = document.getElementById('btnMqttDisconnect');
+        const infoSection = document.getElementById('mqttInfoSection');
+        
+        if (data.connected) {
+            badge.textContent = '已连接';
+            badge.className = 'badge bg-success';
+            connectBtn.style.display = 'none';
+            disconnectBtn.style.display = 'inline-block';
+            infoSection.style.display = 'block';
+            
+            if (data.info) {
+                document.getElementById('mqttInfoText').textContent = JSON.stringify(data.info, null, 2);
+            } else {
+                document.getElementById('mqttInfoText').textContent = '等待数据...';
+            }
+
+            if (!mqttPollInterval) {
+                mqttPollInterval = setInterval(loadMqttStatus, 2000);
+            }
+        } else {
+            badge.textContent = '未连接';
+            badge.className = 'badge bg-secondary';
+            connectBtn.style.display = 'inline-block';
+            disconnectBtn.style.display = 'none';
+            infoSection.style.display = 'none';
+            
+            if (mqttPollInterval) {
+                clearInterval(mqttPollInterval);
+                mqttPollInterval = null;
+            }
+        }
+    }
+
+    window.connectMqtt = function() {
+        const broker = document.getElementById('mqttBroker').value.trim() || 'localhost';
+        const port = parseInt(document.getElementById('mqttPort').value) || 1883;
+        const username = document.getElementById('mqttUsername').value.trim();
+        const password = document.getElementById('mqttPassword').value;
+        
+        const btn = document.getElementById('btnMqttConnect');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>连接中...';
+        
+        fetch('/settings/api/mqtt/connect', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({broker, port, username, password})
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plug me-1"></i>连接';
+            
+            if (data.message) {
+                alert(data.message);
+                loadMqttStatus();
+            } else if (data.error) {
+                alert('连接失败: ' + data.error);
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plug me-1"></i>连接';
+            alert('连接失败: ' + err);
+        });
+    }
+
+    window.disconnectMqtt = function() {
+        fetch('/settings/api/mqtt/disconnect', {
+            method: 'POST'
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message || '已断开');
+            loadMqttStatus();
+        })
+        .catch(err => {
+            alert('断开失败: ' + err);
+        });
     }
 })();
 </script>
